@@ -1,329 +1,336 @@
 import React, { useState, useRef, useCallback } from 'react';
 
 const CORRECT_WORDS = ['หลานสาว', 'สวรรค์', 'ภูเขา'];
-const TARGET_HOUR = 330;
-const TARGET_MIN = 60;
-const TOLERANCE = 25;
+const TARGET_HOUR   = 330;
+const TARGET_MIN    = 60;
+const TOLERANCE     = 25;
+const CLOCK_NUMS    = [12,1,2,3,4,5,6,7,8,9,10,11];
 
-const normalizeAngle = (angle) => ((angle % 360) + 360) % 360;
-const anglesClose = (a, b, tol = TOLERANCE) => {
-  const diff = Math.abs(normalizeAngle(a) - normalizeAngle(b));
-  return diff <= tol || diff >= 360 - tol;
-};
-const CLOCK_NUMBERS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+const norm  = a => ((a % 360) + 360) % 360;
+const close = (a, b) => { const d = Math.abs(norm(a) - norm(b)); return d <= TOLERANCE || d >= 360 - TOLERANCE; };
 
-// ── Shared UI ────────────────────────────────────────────────────────────────
-
-const MedCross = ({ size = 14, color = '#2e7df7' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <rect x="9" y="2" width="6" height="20" rx="1.5"/>
-    <rect x="2" y="9" width="20" height="6" rx="1.5"/>
+/* ── shared ui ── */
+const Cross = ({ s = 14, c = 'var(--mint-primary)' }) => (
+  <svg width={s} height={s} viewBox="0 0 20 20" fill={c}>
+    <rect x="7.5" y="1"   width="5" height="18" rx="1.4"/>
+    <rect x="1"   y="7.5" width="18" height="5" rx="1.4"/>
   </svg>
 );
 
-const Card = ({ children, style }) => (
-  <div style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.09)', borderRadius:20, padding:32, ...style }}>
+const Card = ({ children, style = {} }) => (
+  <div style={{
+    background: 'white',
+    border: '1.5px solid var(--mint-border)',
+    borderRadius: 22,
+    padding: '30px 28px',
+    boxShadow: 'var(--shadow-md)',
+    ...style,
+  }}>
     {children}
   </div>
 );
 
-const StepDot = ({ n, active, done }) => (
-  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-    <div style={{ width:32, height:32, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:13, transition:'all 0.3s',
-      background: done ? '#2e7df7' : active ? 'rgba(46,125,247,0.2)' : 'rgba(255,255,255,0.05)',
-      border: active ? '2px solid #2e7df7' : done ? '2px solid #2e7df7' : '2px solid rgba(255,255,255,0.1)',
-      color: done || active ? '#f0f4fa' : '#8098bc'
-    }}>
-      {done ? '✓' : n}
-    </div>
+const StepBar = ({ step }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 36 }}>
+    {[1,2,3].map((n, i) => (
+      <React.Fragment key={n}>
+        <div style={{
+          width: 34, height: 34, borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 13, fontWeight: 700, flexShrink: 0,
+          background:   step > n ? 'var(--mint-primary)' : step === n ? 'var(--mint-primary-xl)' : 'var(--mint-border2)',
+          border:       `2px solid ${step >= n ? 'var(--mint-primary)' : 'var(--mint-border)'}`,
+          color:        step > n ? 'white' : step === n ? 'var(--mint-primary)' : 'var(--mint-muted)',
+          transition:   'all 0.3s',
+        }}>
+          {step > n ? '✓' : n}
+        </div>
+        {i < 2 && (
+          <div style={{
+            flex: 1, height: 2.5, margin: '0 4px',
+            background: step > n ? 'var(--mint-primary)' : 'var(--mint-border2)',
+            borderRadius: 2, transition: 'background 0.4s',
+          }} />
+        )}
+      </React.Fragment>
+    ))}
   </div>
 );
 
-// ── Main ─────────────────────────────────────────────────────────────────────
+const YN = ({ val, onChange, yL = 'ถูก', nL = 'ผิด' }) => (
+  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+    {[[1, yL, 'var(--mint-primary)', 'var(--mint-primary-xl)', 'var(--mint-primary)'],
+      [0, nL, '#ef4444', '#fff1f1', '#fca5a5']].map(([v, label, col, bg, border]) => (
+      <button key={v} onClick={() => onChange(v)} style={{
+        flex: 1, padding: '9px', borderRadius: 10, fontSize: 13, fontWeight: 700,
+        border: `1.5px solid ${val === v ? border : 'var(--mint-border)'}`,
+        background: val === v ? bg : 'var(--mint-surface2)',
+        color: val === v ? col : 'var(--mint-muted)',
+        cursor: 'pointer', transition: 'all 0.18s',
+      }}>
+        {val === v ? (v===1?'✓ ':'✗ ') : ''}{label}
+      </button>
+    ))}
+  </div>
+);
 
+const SectionHead = ({ n, title, color = 'var(--mint-primary)' }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+    <div style={{
+      width: 30, height: 30, borderRadius: 9,
+      background: color === 'var(--mint-primary)' ? 'var(--mint-primary-xl)' : 'var(--mint-blue-xl)',
+      border: `1.5px solid ${color}44`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 13, fontWeight: 800, color,
+    }}>
+      {n}
+    </div>
+    <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--mint-text)' }}>{title}</h2>
+  </div>
+);
+
+/* ── main ── */
 export default function MiniCogQuiz({ onBack }) {
-  const [step, setStep] = useState(1);
-  const [clockScore, setClockScore] = useState(null);
-  const [userWords, setUserWords] = useState(['', '', '']);
-  const [result, setResult] = useState(null);
-  const [hourAngle, setHourAngle] = useState(0);
-  const [minAngle, setMinAngle] = useState(0);
-  const [dragging, setDragging] = useState(null);
+  const [step, setStep]           = useState(1);
+  const [clockScore, setCS]       = useState(null);
+  const [words, setWords]         = useState(['','','']);
+  const [result, setResult]       = useState(null);
+  const [hourA, setHourA]         = useState(0);
+  const [minA,  setMinA]          = useState(0);
+  const [drag,  setDrag]          = useState(null);
   const clockRef = useRef(null);
 
-  const getAngleFromEvent = useCallback((e) => {
+  const getAngle = useCallback(e => {
     if (!clockRef.current) return 0;
-    const rect = clockRef.current.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return normalizeAngle(Math.atan2(clientY - cy, clientX - cx) * (180 / Math.PI) + 90);
+    const r = clockRef.current.getBoundingClientRect();
+    const cx = r.left + r.width/2, cy = r.top + r.height/2;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    return norm(Math.atan2(y-cy, x-cx)*(180/Math.PI)+90);
   }, []);
 
-  const handleMouseMove = useCallback((e) => {
-    if (!dragging) return;
-    const angle = getAngleFromEvent(e);
-    if (dragging === 'hour') setHourAngle(angle);
-    else setMinAngle(angle);
-  }, [dragging, getAngleFromEvent]);
+  const onMove = useCallback(e => {
+    if (!drag) return;
+    const a = getAngle(e);
+    drag === 'hour' ? setHourA(a) : setMinA(a);
+  }, [drag, getAngle]);
 
-  const handleMouseUp = useCallback(() => setDragging(null), []);
-
-  const evaluateClock = () => {
-    const score = (anglesClose(hourAngle, TARGET_HOUR) && anglesClose(minAngle, TARGET_MIN)) ? 2 : 0;
-    setClockScore(score);
-    setStep(3);
+  const evalClock = () => {
+    const sc = (close(hourA, TARGET_HOUR) && close(minA, TARGET_MIN)) ? 2 : 0;
+    setCS(sc); setStep(3);
   };
 
-  const checkRecall = () => {
-    const correct = userWords.filter(w => CORRECT_WORDS.includes(w.trim())).length;
-    const total = (clockScore ?? 0) + correct;
-    setResult({ clockScore: clockScore ?? 0, recallScore: correct, total, impaired: total <= 3 });
+  const evalRecall = () => {
+    const rc = words.filter(w => CORRECT_WORDS.includes(w.trim())).length;
+    const total = (clockScore??0) + rc;
+    setResult({ clockScore: clockScore??0, recallScore: rc, total, impaired: total <= 3 });
     setStep(4);
   };
 
-  const S = { fontFamily:"'DM Sans','Sarabun',sans-serif" };
+  const reset = () => { setStep(1); setWords(['','','']); setCS(null); setResult(null); setHourA(0); setMinA(0); };
 
   return (
-    <div style={{ ...S, minHeight:'100vh', background:'transparent', position:'relative', zIndex:1, display:'flex', flexDirection:'column' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Top bar */}
-      <div style={{ position:'sticky', top:0, zIndex:50, background:'rgba(10,22,40,0.9)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,0.07)', padding:'0 32px', height:60, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <button onClick={onBack} style={{ display:'flex', alignItems:'center', gap:8, background:'none', border:'none', color:'#8098bc', cursor:'pointer', fontSize:13, fontWeight:600 }}>
+      {/* topbar */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 50,
+        background: 'rgba(240,250,248,0.9)', backdropFilter: 'blur(18px)',
+        borderBottom: '1px solid var(--mint-border)',
+        padding: '0 32px', height: 60,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--mint-muted)', cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
           ← กลับ
         </button>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <MedCross size={14} color="#2e7df7" />
-          <span style={{ fontSize:14, fontWeight:700, color:'#f0f4fa' }}>Mini-Cog™</span>
-          <span style={{ fontSize:11, color:'#8098bc' }}>แบบประเมินภาวะการรู้คิด</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Cross s={14} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--mint-text)' }}>Mini-Cog™</span>
+          <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>แบบประเมินภาวะการรู้คิด</span>
         </div>
-        <div style={{ fontSize:12, color:'#8098bc' }}>ขั้นตอน {Math.min(step,3)}/3</div>
+        <div style={{ fontSize: 12, color: 'var(--mint-muted)', fontWeight: 600 }}>ขั้นตอน {Math.min(step,3)}/3</div>
       </div>
 
-      <div style={{ flex:1, maxWidth:560, margin:'0 auto', width:'100%', padding:'40px 24px' }}>
+      <div style={{ flex: 1, maxWidth: 540, margin: '0 auto', width: '100%', padding: '40px 20px' }}>
+        <StepBar step={step} />
 
-        {/* Progress */}
-        <div style={{ display:'flex', alignItems:'center', gap:0, marginBottom:40 }}>
-          {[1,2,3].map((n, i) => (
-            <React.Fragment key={n}>
-              <StepDot n={n} active={step === n} done={step > n} />
-              {i < 2 && (
-                <div style={{ flex:1, height:2, margin:'0 4px', background: step > n ? '#2e7df7' : 'rgba(255,255,255,0.08)', borderRadius:1, transition:'background 0.4s' }} />
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-
-        {/* Step 1 */}
+        {/* ── Step 1 ── */}
         {step === 1 && (
-          <Card>
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:24 }}>
-              <div style={{ width:28, height:28, background:'rgba(46,125,247,0.15)', border:'1px solid rgba(46,125,247,0.3)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'#2e7df7' }}>1</div>
-              <h2 style={{ fontSize:17, fontWeight:700, color:'#f0f4fa' }}>การลงทะเบียนคำศัพท์</h2>
-            </div>
-
-            <div style={{ background:'rgba(46,125,247,0.08)', border:'1px solid rgba(46,125,247,0.18)', borderRadius:16, padding:20, marginBottom:24 }}>
-              <p style={{ fontSize:13, color:'#8098bc', lineHeight:1.7, marginBottom:16, fontStyle:'italic', textAlign:'center' }}>
+          <Card className="scale-in">
+            <SectionHead n="1" title="การลงทะเบียนคำศัพท์" />
+            <div style={{ background: 'var(--mint-primary-xl)', border: '1px solid var(--mint-border)', borderRadius: 16, padding: 20, marginBottom: 24 }}>
+              <p style={{ fontSize: 13, color: 'var(--mint-text2)', fontStyle: 'italic', textAlign: 'center', lineHeight: 1.75, marginBottom: 16 }}>
                 "ให้ตั้งใจฟังดีๆ เดี๋ยวจะบอกคำ 3 คำ เมื่อพูดจบแล้วให้พูดตามและจำไว้ เดี๋ยวจะกลับมาถามซ้ำ"
               </p>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10 }}>
-                {CORRECT_WORDS.map(word => (
-                  <div key={word} style={{ background:'rgba(255,255,255,0.05)', border:'1px solid rgba(46,125,247,0.25)', borderRadius:12, padding:'14px 8px', textAlign:'center', fontWeight:800, fontSize:15, color:'#5b9bff' }}>
-                    {word}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+                {CORRECT_WORDS.map(w => (
+                  <div key={w} style={{ background: 'white', border: '1.5px solid var(--mint-border)', borderRadius: 12, padding: '14px 8px', textAlign: 'center', fontWeight: 800, fontSize: 15, color: 'var(--mint-primary)', boxShadow: 'var(--shadow-sm)' }}>
+                    {w}
                   </div>
                 ))}
               </div>
             </div>
-
-            <button onClick={() => setStep(2)} style={{ width:'100%', padding:'14px', background:'linear-gradient(135deg,#2e7df7,#1a56cc)', color:'white', border:'none', borderRadius:14, fontSize:15, fontWeight:700, cursor:'pointer', boxShadow:'0 8px 24px rgba(46,125,247,0.3)', transition:'all 0.2s' }}
-              onMouseOver={e=>e.target.style.transform='translateY(-1px)'}
-              onMouseOut={e=>e.target.style.transform='translateY(0)'}>
+            <button onClick={() => setStep(2)} style={{ width: '100%', padding: 14, background: 'linear-gradient(135deg,var(--mint-primary),var(--mint-primary-l))', color: 'white', border: 'none', borderRadius: 13, fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: '0 6px 18px rgba(14,159,142,0.3)' }}>
               จำคำศัพท์ได้แล้ว →
             </button>
           </Card>
         )}
 
-        {/* Step 2 */}
+        {/* ── Step 2 ── */}
         {step === 2 && (
-          <Card>
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-              <div style={{ width:28, height:28, background:'rgba(139,92,246,0.15)', border:'1px solid rgba(139,92,246,0.3)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'#a78bfa' }}>2</div>
-              <h2 style={{ fontSize:17, fontWeight:700, color:'#f0f4fa' }}>การวาดรูปนาฬิกา</h2>
-            </div>
-            <p style={{ fontSize:13, color:'#8098bc', marginBottom:24, paddingLeft:38 }}>
-              ลากเข็มนาฬิกาไปที่เวลา <strong style={{ color:'#a78bfa' }}>11:10 น.</strong>
-              <br /><span style={{ fontSize:11 }}>🔵 เข็มน้ำเงิน = ชั่วโมง &nbsp;|&nbsp; 🟣 เข็มม่วง = นาที</span>
+          <Card className="scale-in">
+            <SectionHead n="2" title="การวาดรูปนาฬิกา" color="var(--mint-blue)" />
+            <p style={{ fontSize: 13, color: 'var(--mint-text2)', marginBottom: 24, paddingLeft: 40 }}>
+              ลากเข็มไปที่เวลา <strong style={{ color: 'var(--mint-blue)' }}>11:10 น.</strong>
+              <br /><span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>🔵 น้ำเงิน = ชั่วโมง &nbsp;|&nbsp; 🟣 ม่วง = นาที</span>
             </p>
 
-            {/* Clock */}
+            {/* clock */}
             <div
               ref={clockRef}
-              onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
-              onTouchMove={handleMouseMove} onTouchEnd={handleMouseUp}
-              style={{ position:'relative', width:260, height:260, margin:'0 auto 24px', userSelect:'none', touchAction:'none' }}
+              onMouseMove={onMove} onMouseUp={() => setDrag(null)} onMouseLeave={() => setDrag(null)}
+              onTouchMove={onMove} onTouchEnd={() => setDrag(null)}
+              style={{ position: 'relative', width: 260, height: 260, margin: '0 auto 24px', userSelect: 'none', touchAction: 'none' }}
             >
-              {/* Face */}
-              <div style={{ position:'absolute', inset:0, borderRadius:'50%', background:'radial-gradient(circle at 40% 35%, rgba(255,255,255,0.07), rgba(255,255,255,0.02))', border:'3px solid rgba(255,255,255,0.15)', boxShadow:'0 0 40px rgba(46,125,247,0.12), inset 0 0 30px rgba(0,0,0,0.3)' }} />
+              {/* face */}
+              <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'linear-gradient(145deg,#f8fffe,white)', border: '3px solid var(--mint-border)', boxShadow: '0 4px 24px rgba(14,159,142,0.12), inset 0 1px 4px rgba(255,255,255,0.8)' }} />
 
-              {/* Tick marks */}
-              {[...Array(60)].map((_, i) => {
-                const angle = (i * 6 - 90) * (Math.PI / 180);
-                const isMajor = i % 5 === 0;
-                const r1 = isMajor ? 92 : 97, r2 = 103;
+              {/* ticks */}
+              {[...Array(60)].map((_,i) => {
+                const ang = (i*6-90)*(Math.PI/180), maj = i%5===0;
+                const r1 = maj?91:96, r2=103;
                 return (
-                  <svg key={i} style={{ position:'absolute', inset:0, pointerEvents:'none' }} width="260" height="260">
-                    <line x1={130+r1*Math.cos(angle)} y1={130+r1*Math.sin(angle)} x2={130+r2*Math.cos(angle)} y2={130+r2*Math.sin(angle)}
-                      stroke={isMajor ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)'} strokeWidth={isMajor?2:1} />
+                  <svg key={i} style={{ position:'absolute',inset:0,pointerEvents:'none' }} width="260" height="260">
+                    <line x1={130+r1*Math.cos(ang)} y1={130+r1*Math.sin(ang)} x2={130+r2*Math.cos(ang)} y2={130+r2*Math.sin(ang)}
+                      stroke={maj?'var(--mint-text2)':'var(--mint-border)'} strokeWidth={maj?2:1} />
                   </svg>
                 );
               })}
 
-              {/* Numbers */}
-              {CLOCK_NUMBERS.map((num, i) => {
-                const angle = (i * 30 - 90) * (Math.PI / 180);
-                const r = 110;
+              {/* numbers */}
+              {CLOCK_NUMS.map((num,i) => {
+                const ang = (i*30-90)*(Math.PI/180), r=108;
                 return (
-                  <span key={num} style={{ position:'absolute', left:130+r*Math.cos(angle), top:130+r*Math.sin(angle), transform:'translate(-50%,-50%)', fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.7)', pointerEvents:'none' }}>
+                  <span key={num} style={{ position:'absolute', left:130+r*Math.cos(ang), top:130+r*Math.sin(ang), transform:'translate(-50%,-50%)', fontSize:11, fontWeight:700, color:'var(--mint-text2)', pointerEvents:'none' }}>
                     {num}
                   </span>
                 );
               })}
 
-              {/* Hour hand */}
-              <div
-                onMouseDown={() => setDragging('hour')} onTouchStart={() => setDragging('hour')}
-                style={{ position:'absolute', left:130, top:130, width:6, height:72, marginLeft:-3, marginTop:-72, transformOrigin:'bottom center', transform:`rotate(${hourAngle}deg)`, cursor:'grab' }}
-              >
-                <div style={{ width:'100%', height:'100%', background:'linear-gradient(to top,#2e7df7,#5b9bff)', borderRadius:4 }} />
-                <div style={{ position:'absolute', top:-10, left:'50%', transform:'translateX(-50%)', width:20, height:20, background:'#2e7df7', borderRadius:'50%', border:'2px solid rgba(255,255,255,0.3)', boxShadow:'0 0 10px rgba(46,125,247,0.5)' }} />
+              {/* hour hand */}
+              <div onMouseDown={() => setDrag('hour')} onTouchStart={() => setDrag('hour')}
+                style={{ position:'absolute', left:130, top:130, width:6, height:72, marginLeft:-3, marginTop:-72, transformOrigin:'bottom center', transform:`rotate(${hourA}deg)`, cursor:'grab' }}>
+                <div style={{ width:'100%', height:'100%', background:'linear-gradient(to top,#0e9f8e,#34d9c5)', borderRadius:4, boxShadow:'0 2px 6px rgba(14,159,142,0.35)' }} />
+                <div style={{ position:'absolute', top:-11, left:'50%', transform:'translateX(-50%)', width:22, height:22, background:'var(--mint-primary)', borderRadius:'50%', border:'3px solid white', boxShadow:'0 2px 8px rgba(14,159,142,0.4)' }} />
               </div>
 
-              {/* Minute hand */}
-              <div
-                onMouseDown={() => setDragging('min')} onTouchStart={() => setDragging('min')}
-                style={{ position:'absolute', left:130, top:130, width:4, height:90, marginLeft:-2, marginTop:-90, transformOrigin:'bottom center', transform:`rotate(${minAngle}deg)`, cursor:'grab' }}
-              >
-                <div style={{ width:'100%', height:'100%', background:'linear-gradient(to top,#7c3aed,#a78bfa)', borderRadius:4 }} />
-                <div style={{ position:'absolute', top:-10, left:'50%', transform:'translateX(-50%)', width:20, height:20, background:'#7c3aed', borderRadius:'50%', border:'2px solid rgba(255,255,255,0.3)', boxShadow:'0 0 10px rgba(124,58,237,0.5)' }} />
+              {/* minute hand */}
+              <div onMouseDown={() => setDrag('min')} onTouchStart={() => setDrag('min')}
+                style={{ position:'absolute', left:130, top:130, width:4, height:90, marginLeft:-2, marginTop:-90, transformOrigin:'bottom center', transform:`rotate(${minA}deg)`, cursor:'grab' }}>
+                <div style={{ width:'100%', height:'100%', background:'linear-gradient(to top,#3b82f6,#93c5fd)', borderRadius:4, boxShadow:'0 2px 6px rgba(59,130,246,0.35)' }} />
+                <div style={{ position:'absolute', top:-11, left:'50%', transform:'translateX(-50%)', width:22, height:22, background:'var(--mint-blue)', borderRadius:'50%', border:'3px solid white', boxShadow:'0 2px 8px rgba(59,130,246,0.4)' }} />
               </div>
 
-              {/* Center */}
-              <div style={{ position:'absolute', left:130, top:130, width:12, height:12, background:'#f0f4fa', borderRadius:'50%', transform:'translate(-50%,-50%)', zIndex:10, boxShadow:'0 0 8px rgba(255,255,255,0.3)' }} />
+              {/* center */}
+              <div style={{ position:'absolute', left:130, top:130, width:12, height:12, background:'var(--mint-text)', borderRadius:'50%', transform:'translate(-50%,-50%)', zIndex:10 }} />
             </div>
 
-            {/* Angle display */}
+            {/* angle display */}
             <div style={{ display:'flex', justifyContent:'center', gap:20, marginBottom:20 }}>
-              {[['🔵','ชั่วโมง',hourAngle,'#2e7df7'],['🟣','นาที',minAngle,'#a78bfa']].map(([em,label,angle,color]) => (
-                <div key={label} style={{ fontSize:12, color:'#8098bc', display:'flex', alignItems:'center', gap:4 }}>
-                  <span>{em}</span>
-                  <span>{label}:</span>
-                  <span style={{ color, fontWeight:700 }}>{Math.round(normalizeAngle(angle))}°</span>
-                </div>
+              {[['🔵','ชั่วโมง',hourA,'var(--mint-primary)'],['🟣','นาที',minA,'var(--mint-blue)']].map(([em,lb,a,c]) => (
+                <span key={lb} style={{ fontSize:12, color:'var(--mint-muted)', display:'flex', alignItems:'center', gap:4 }}>
+                  {em} {lb}: <strong style={{ color:c }}>{Math.round(norm(a))}°</strong>
+                </span>
               ))}
             </div>
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:8 }}>
-              <button onClick={evaluateClock} style={{ padding:'13px', background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.12)', color:'#f0f4fa', borderRadius:12, fontSize:13, fontWeight:700, cursor:'pointer', transition:'all 0.2s' }}>
+              <button onClick={evalClock} style={{ padding:13, background:'var(--mint-text)', color:'white', border:'none', borderRadius:12, fontSize:13, fontWeight:700, cursor:'pointer' }}>
                 ตรวจอัตโนมัติ
               </button>
-              <button onClick={() => { setClockScore(2); setStep(3); }} style={{ padding:'13px', background:'rgba(34,197,94,0.1)', border:'1px solid rgba(34,197,94,0.25)', color:'#4ade80', borderRadius:12, fontSize:13, fontWeight:700, cursor:'pointer', transition:'all 0.2s' }}>
-                ถูกต้อง (2 คะแนน)
+              <button onClick={() => { setCS(2); setStep(3); }} style={{ padding:13, background:'#f0fdf4', color:'#16a34a', border:'1px solid #bbf7d0', borderRadius:12, fontSize:13, fontWeight:700, cursor:'pointer' }}>
+                ✓ ถูกต้อง (2 คะแนน)
               </button>
             </div>
-            <button onClick={() => { setClockScore(0); setStep(3); }} style={{ width:'100%', padding:'10px', background:'none', border:'none', color:'#8098bc', fontSize:12, cursor:'pointer', transition:'color 0.2s' }}>
+            <button onClick={() => { setCS(0); setStep(3); }} style={{ width:'100%', padding:10, background:'none', border:'none', color:'var(--mint-muted)', fontSize:12, cursor:'pointer' }}>
               ไม่ถูกต้อง (0 คะแนน) →
             </button>
           </Card>
         )}
 
-        {/* Step 3 */}
+        {/* ── Step 3 ── */}
         {step === 3 && (
-          <Card>
-            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
-              <div style={{ width:28, height:28, background:'rgba(20,184,166,0.15)', border:'1px solid rgba(20,184,166,0.3)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, color:'#14b8a6' }}>3</div>
-              <h2 style={{ fontSize:17, fontWeight:700, color:'#f0f4fa' }}>การทดสอบความจำ</h2>
-            </div>
-            <p style={{ fontSize:13, color:'#8098bc', marginBottom:24, paddingLeft:38 }}>พิมพ์คำศัพท์ 3 คำที่จำได้จากตอนแรก</p>
-
+          <Card className="scale-in">
+            <SectionHead n="3" title="การทดสอบความจำ" />
+            <p style={{ fontSize:13, color:'var(--mint-text2)', marginBottom:24, paddingLeft:40 }}>พิมพ์คำศัพท์ 3 คำที่จำได้จากตอนแรก</p>
             <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:24 }}>
-              {userWords.map((w, i) => (
-                <input
-                  key={i}
-                  type="text"
-                  placeholder={`คำที่ ${i + 1}`}
-                  value={w}
-                  onChange={e => { const a=[...userWords]; a[i]=e.target.value; setUserWords(a); }}
-                  style={{ width:'100%', padding:'14px 18px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:12, fontSize:16, fontWeight:700, color:'#f0f4fa', outline:'none', textAlign:'center', transition:'border-color 0.2s', boxSizing:'border-box' }}
-                  onFocus={e => e.target.style.borderColor='rgba(20,184,166,0.5)'}
-                  onBlur={e => e.target.style.borderColor='rgba(255,255,255,0.1)'}
+              {words.map((w,i) => (
+                <input key={i} type="text" placeholder={`คำที่ ${i+1}`} value={w}
+                  onChange={e => { const a=[...words]; a[i]=e.target.value; setWords(a); }}
+                  style={{ width:'100%', padding:'13px 16px', background:'var(--mint-surface2)', border:'1.5px solid var(--mint-border)', borderRadius:12, fontSize:15, fontWeight:700, color:'var(--mint-text)', outline:'none', textAlign:'center', boxSizing:'border-box', transition:'border-color 0.18s' }}
+                  onFocus={e => e.target.style.borderColor='var(--mint-primary)'}
+                  onBlur={e  => e.target.style.borderColor='var(--mint-border)'}
                 />
               ))}
             </div>
-
-            <button onClick={checkRecall} style={{ width:'100%', padding:'14px', background:'linear-gradient(135deg,#0d9488,#14b8a6)', color:'white', border:'none', borderRadius:14, fontSize:15, fontWeight:700, cursor:'pointer', boxShadow:'0 8px 24px rgba(13,148,136,0.3)' }}>
+            <button onClick={evalRecall} style={{ width:'100%', padding:14, background:'linear-gradient(135deg,var(--mint-primary),var(--mint-primary-l))', color:'white', border:'none', borderRadius:13, fontSize:15, fontWeight:700, cursor:'pointer', boxShadow:'0 6px 18px rgba(14,159,142,0.3)' }}>
               ส่งคำตอบและดูผล →
             </button>
           </Card>
         )}
 
-        {/* Step 4 — Result */}
+        {/* ── Step 4 Result ── */}
         {step === 4 && result && (
-          <Card>
-            {/* Score circle */}
-            <div style={{ textAlign:'center', marginBottom:28 }}>
-              <div style={{ position:'relative', width:100, height:100, margin:'0 auto 12px' }}>
-                <svg width="100" height="100" style={{ position:'absolute', inset:0 }}>
-                  <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6"/>
-                  <circle cx="50" cy="50" r="44" fill="none"
-                    stroke={result.impaired ? '#f59e0b' : '#14b8a6'} strokeWidth="6"
-                    strokeDasharray={`${(result.total/5)*276.5} 276.5`}
-                    strokeLinecap="round" transform="rotate(-90 50 50)"
-                    style={{ transition:'stroke-dasharray 1s ease' }}
+          <Card className="scale-in">
+            {/* circle */}
+            <div style={{ textAlign:'center', marginBottom:24 }}>
+              <div style={{ position:'relative', width:110, height:110, margin:'0 auto 10px' }}>
+                <svg width="110" height="110" style={{ position:'absolute',inset:0 }}>
+                  <circle cx="55" cy="55" r="48" fill="none" stroke="var(--mint-border2)" strokeWidth="7"/>
+                  <circle cx="55" cy="55" r="48" fill="none"
+                    stroke={result.impaired ? 'var(--mint-warn)' : 'var(--mint-primary)'} strokeWidth="7"
+                    strokeDasharray={`${(result.total/5)*301.6} 301.6`}
+                    strokeLinecap="round" transform="rotate(-90 55 55)"
+                    style={{ transition:'stroke-dasharray 0.9s ease' }}
                   />
                 </svg>
-                <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center' }}>
-                  <span style={{ fontSize:28, fontWeight:800, color: result.impaired ? '#f59e0b' : '#14b8a6' }}>{result.total}</span>
-                  <span style={{ fontSize:10, color:'#8098bc' }}>/ 5</span>
+                <div style={{ position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center' }}>
+                  <span style={{ fontSize:30, fontWeight:800, color: result.impaired?'var(--mint-warn)':'var(--mint-primary)' }}>{result.total}</span>
+                  <span style={{ fontSize:11, color:'var(--mint-muted)' }}>/ 5</span>
                 </div>
               </div>
-              <p style={{ fontSize:11, color:'#8098bc', letterSpacing:'0.1em', textTransform:'uppercase' }}>คะแนนรวม</p>
+              <p style={{ fontSize:11, color:'var(--mint-muted)', letterSpacing:'0.08em', textTransform:'uppercase' }}>คะแนนรวม</p>
             </div>
 
-            {/* Status */}
-            <div style={{ borderRadius:14, padding:'16px 20px', marginBottom:20, background: result.impaired ? 'rgba(245,158,11,0.1)' : 'rgba(20,184,166,0.1)', border:`1px solid ${result.impaired ? 'rgba(245,158,11,0.3)' : 'rgba(20,184,166,0.3)'}` }}>
-              <p style={{ fontWeight:700, textAlign:'center', fontSize:14, color: result.impaired ? '#fbbf24' : '#2dd4bf' }}>
+            {/* status */}
+            <div style={{ borderRadius:14, padding:'14px 18px', marginBottom:20, background: result.impaired?'#fff7ed':'#f0fdf9', border:`1.5px solid ${result.impaired?'#fcd34d':'#6ee7d5'}` }}>
+              <p style={{ fontWeight:700, textAlign:'center', fontSize:14, color: result.impaired?'#92400e':'#065f46' }}>
                 {result.impaired ? '⚠️ มีภาวะการรู้คิดบกพร่อง (Cognitive Impairment)' : '✅ ผลการประเมินเบื้องต้นอยู่ในเกณฑ์ปกติ'}
               </p>
             </div>
 
-            {/* Breakdown */}
+            {/* breakdown */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:20 }}>
-              {[['Clock Drawing', result.clockScore, 2, '#5b9bff'], ['Word Recall', result.recallScore, 3, '#14b8a6']].map(([label, score, max, color]) => (
-                <div key={label} style={{ background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:12, padding:'14px', textAlign:'center' }}>
-                  <p style={{ fontSize:22, fontWeight:800, color }}>{score}<span style={{ fontSize:13, fontWeight:400, color:'#8098bc' }}>/{max}</span></p>
-                  <p style={{ fontSize:11, color:'#8098bc', marginTop:4 }}>{label}</p>
+              {[['Clock Drawing',result.clockScore,2,'var(--mint-primary)'],['Word Recall',result.recallScore,3,'var(--mint-blue)']].map(([lb,sc,mx,c]) => (
+                <div key={lb} style={{ background:'var(--mint-surface2)', border:'1px solid var(--mint-border2)', borderRadius:12, padding:'14px', textAlign:'center' }}>
+                  <p style={{ fontSize:24, fontWeight:800, color:c }}>{sc}<span style={{ fontSize:13, fontWeight:400, color:'var(--mint-muted)' }}>/{mx}</span></p>
+                  <p style={{ fontSize:11, color:'var(--mint-muted)', marginTop:3 }}>{lb}</p>
                 </div>
               ))}
             </div>
 
-            <p style={{ fontSize:11, color:'#8098bc', textAlign:'center', marginBottom:20 }}>
-              * ผลนี้เป็นการประเมินเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์
-            </p>
+            <p style={{ fontSize:11, color:'var(--mint-muted)', textAlign:'center', marginBottom:18 }}>* ผลนี้เป็นการประเมินเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์</p>
 
-            <button
-              onClick={() => { setStep(1); setUserWords(['','','']); setClockScore(null); setResult(null); setHourAngle(0); setMinAngle(0); }}
-              style={{ width:'100%', padding:'14px', background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.1)', color:'#f0f4fa', borderRadius:14, fontSize:14, fontWeight:700, cursor:'pointer' }}>
+            <button onClick={reset} style={{ width:'100%', padding:13, background:'var(--mint-surface2)', border:'1.5px solid var(--mint-border)', color:'var(--mint-text)', borderRadius:12, fontSize:14, fontWeight:700, cursor:'pointer', marginBottom:8 }}>
               ทำแบบทดสอบใหม่
             </button>
-            <button onClick={onBack} style={{ width:'100%', padding:'10px', background:'none', border:'none', color:'#8098bc', fontSize:12, cursor:'pointer', marginTop:6 }}>
+            <button onClick={onBack} style={{ width:'100%', padding:9, background:'none', border:'none', color:'var(--mint-muted)', fontSize:12, cursor:'pointer' }}>
               ← กลับหน้าหลัก
             </button>
           </Card>
         )}
       </div>
-
-      <p style={{ textAlign:'center', fontSize:11, color:'#4a5568', padding:'16px', position:'relative', zIndex:1 }}>Mini-Cog™ © S. Borson</p>
+      <p style={{ textAlign:'center', fontSize:11, color:'var(--mint-muted)', padding:'14px', background:'white', borderTop:'1px solid var(--mint-border2)' }}>Mini-Cog™ © S. Borson</p>
     </div>
   );
 }
