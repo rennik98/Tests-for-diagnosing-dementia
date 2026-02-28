@@ -411,7 +411,25 @@ export default function App() {
   const [quiz,       setQuiz]     = useState(null);     // 'minicog' | 'tmse'
   const [showForm,   setShowForm] = useState(null);     // 'minicog' | 'tmse'
   const [patient,    setPatient]  = useState(null);     // { name, age }
-  const [allResults, setAllResults] = useState([]);
+
+  const STORAGE_KEY = 'dementia_eval_results';
+  const [allResults, setAllResults] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Sync to localStorage whenever allResults changes
+  const saveResults = (updater) => {
+    setAllResults(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   /* Step 2 → 3: patient form confirmed, launch quiz */
   const handleFormConfirm = (info) => {
@@ -428,7 +446,7 @@ export default function App() {
       now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
       + ' ' + now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 
-    setAllResults(prev => [...prev, {
+    saveResults(prev => [...prev, {
       name:       patient?.name ?? 'ไม่ระบุ',
       age:        patient?.age  ?? '-',
       type:       scoreData.type,
@@ -609,7 +627,7 @@ export default function App() {
           <ResultsPage
             results={allResults}
             onExport={() => exportCSV(allResults)}
-            onClear={() => setAllResults([])}
+            onClear={() => saveResults([])}
           />
         )}
 
