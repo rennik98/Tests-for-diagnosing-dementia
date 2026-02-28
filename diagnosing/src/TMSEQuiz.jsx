@@ -39,7 +39,6 @@ const YN = ({ val, onChange, yL='ถูก', nL='ผิด' }) => (
 
 const Section = ({ num, title, max, score, color='var(--mint-primary)', children }) => (
   <div style={{ background:'white', border:`1.5px solid ${color}33`, borderRadius:20, padding:'26px 24px', boxShadow:'var(--shadow-sm)', position:'relative', overflow:'hidden' }}>
-    {/* left accent */}
     <div style={{ position:'absolute', left:0, top:14, bottom:14, width:4, borderRadius:'0 3px 3px 0', background:color }} />
     <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:18 }}>
       <div style={{ width:30, height:30, borderRadius:9, background:`${color}18`, border:`1.5px solid ${color}44`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color }}>
@@ -87,7 +86,7 @@ const ActionBtn = ({ children, onClick, variant='primary' }) => {
 };
 
 /* ── main ── */
-export default function TMSEQuiz({ onBack }) {
+export default function TMSEQuiz({ onBack, onComplete, patient }) {
   const [oriS,  setOriS]  = useState(Array(6).fill(null));
   const [regS,  setRegS]  = useState(null);
   const [days,  setDays]  = useState([...DAYS_ORDER].reverse());
@@ -114,15 +113,61 @@ export default function TMSEQuiz({ onBack }) {
   const evalRec  = () => { let s=0; recW.forEach(w=>{if(REG_WORDS.includes(w.trim()))s++;}); setRecS(s); };
   const setCmd   = (i, v) => { const c=[...langS.commands]; c[i]=v; setLangS(s=>({...s,commands:c})); };
 
+  const handleFinish = () => {
+    setDone(true);
+    if (onComplete) {
+      onComplete({
+        type: 'TMSE',
+        totalScore: total,
+        maxScore: 30,
+        impaired,
+        breakdown: {
+          orientation:  oriTotal,
+          registration: regS ?? 0,
+          attention:    attS ?? 0,
+          calculation:  calcS ?? 0,
+          language:     langTotal,
+          recall:       recS ?? 0,
+        },
+      });
+    }
+  };
+
   /* ── Result ── */
   if (done) {
-    const sections=[{l:'Orientation',s:oriTotal,m:6},{l:'Registration',s:regS??0,m:3},{l:'Attention',s:attS??0,m:5},{l:'Calculation',s:calcS??0,m:3},{l:'Language',s:langTotal,m:10},{l:'Recall',s:recS??0,m:3}];
+    const sections=[
+      {l:'Orientation',  s:oriTotal,   m:6},
+      {l:'Registration', s:regS??0,    m:3},
+      {l:'Attention',    s:attS??0,    m:5},
+      {l:'Calculation',  s:calcS??0,   m:3},
+      {l:'Language',     s:langTotal,  m:10},
+      {l:'Recall',       s:recS??0,    m:3},
+    ];
     return (
       <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column' }}>
         <div style={{ position:'sticky',top:0,zIndex:50,background:'rgba(240,250,248,0.9)',backdropFilter:'blur(18px)',borderBottom:'1px solid var(--mint-border)',padding:'0 32px',height:60,display:'flex',alignItems:'center',gap:10 }}>
           <Cross s={14}/><span style={{ fontSize:14,fontWeight:700,color:'var(--mint-text)' }}>TMSE — ผลการประเมิน</span>
+          {patient && (
+            <span style={{ fontSize:12,color:'var(--mint-blue)',fontWeight:600,background:'var(--mint-blue-xl)',padding:'2px 10px',borderRadius:20,border:'1px solid var(--mint-border)',marginLeft:4 }}>
+              {patient.name} · {patient.age} ปี
+            </span>
+          )}
         </div>
         <div style={{ flex:1,maxWidth:520,margin:'0 auto',width:'100%',padding:'40px 20px' }}>
+
+          {/* patient info */}
+          {patient && (
+            <div style={{ display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:'var(--mint-blue-xl)',border:'1px solid var(--mint-border)',borderRadius:14,marginBottom:20 }}>
+              <span style={{ fontSize:18 }}>👤</span>
+              <div>
+                <p style={{ fontSize:14,fontWeight:700,color:'var(--mint-text)' }}>{patient.name}</p>
+                <p style={{ fontSize:12,color:'var(--mint-muted)' }}>อายุ {patient.age} ปี</p>
+              </div>
+              <div style={{ marginLeft:'auto',fontSize:11,color:'var(--mint-blue)',fontWeight:700,background:'white',padding:'4px 10px',borderRadius:20,border:'1px solid var(--mint-border)' }}>
+                ✅ บันทึกแล้ว
+              </div>
+            </div>
+          )}
 
           {/* score ring */}
           <div style={{ textAlign:'center',marginBottom:28 }}>
@@ -183,7 +228,11 @@ export default function TMSEQuiz({ onBack }) {
         <div style={{ display:'flex',alignItems:'center',gap:8 }}>
           <Cross s={14}/>
           <span style={{ fontSize:14,fontWeight:700,color:'var(--mint-text)' }}>TMSE</span>
-          <span style={{ fontSize:11,color:'var(--mint-muted)' }}>Thai Mental State Examination</span>
+          {patient && (
+            <span style={{ fontSize:12,color:'var(--mint-blue)',fontWeight:600,background:'var(--mint-blue-xl)',padding:'2px 10px',borderRadius:20,border:'1px solid var(--mint-border)' }}>
+              {patient.name} · {patient.age} ปี
+            </span>
+          )}
         </div>
         <div style={{ fontSize:12,fontWeight:700,color:'var(--mint-primary)',background:'var(--mint-primary-xl)',border:'1px solid var(--mint-border)',borderRadius:20,padding:'3px 12px' }}>
           {total}/30
@@ -368,7 +417,7 @@ export default function TMSEQuiz({ onBack }) {
           <div style={{ height:8,borderRadius:4,background:'var(--mint-border2)',overflow:'hidden',marginBottom:20 }}>
             <div style={{ height:'100%',borderRadius:4,background:`linear-gradient(90deg,${total>=24?'var(--mint-primary),var(--mint-primary-l)':'var(--mint-warn),#fcd34d'})`,width:`${(total/30)*100}%`,transition:'width 0.5s ease' }}/>
           </div>
-          <ActionBtn onClick={()=>setDone(true)} variant="primary">ดูผลการประเมิน →</ActionBtn>
+          <ActionBtn onClick={handleFinish} variant="primary">ดูผลการประเมิน →</ActionBtn>
           <div style={{ height:8 }}/>
           <ActionBtn onClick={onBack} variant="outline">← กลับหน้าหลัก</ActionBtn>
         </div>

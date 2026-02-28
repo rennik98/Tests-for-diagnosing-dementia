@@ -90,7 +90,7 @@ const SectionHead = ({ n, title, color = 'var(--mint-primary)' }) => (
 );
 
 /* ── main ── */
-export default function MiniCogQuiz({ onBack }) {
+export default function MiniCogQuiz({ onBack, onComplete, patient }) {
   const [step, setStep]           = useState(1);
   const [clockScore, setCS]       = useState(null);
   const [words, setWords]         = useState(['','','']);
@@ -122,9 +122,25 @@ export default function MiniCogQuiz({ onBack }) {
 
   const evalRecall = () => {
     const rc = words.filter(w => CORRECT_WORDS.includes(w.trim())).length;
-    const total = (clockScore??0) + rc;
-    setResult({ clockScore: clockScore??0, recallScore: rc, total, impaired: total <= 3 });
+    const cs = clockScore ?? 0;
+    const total = cs + rc;
+    const r = { clockScore: cs, recallScore: rc, total, impaired: total <= 3 };
+    setResult(r);
     setStep(4);
+
+    // Notify parent
+    if (onComplete) {
+      onComplete({
+        type: 'Mini-Cog',
+        totalScore: total,
+        maxScore: 5,
+        impaired: total <= 3,
+        breakdown: {
+          clockDrawing: cs,
+          wordRecall: rc,
+        },
+      });
+    }
   };
 
   const reset = () => { setStep(1); setWords(['','','']); setCS(null); setResult(null); setHourA(0); setMinA(0); };
@@ -146,7 +162,11 @@ export default function MiniCogQuiz({ onBack }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Cross s={14} />
           <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--mint-text)' }}>Mini-Cog™</span>
-          <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>แบบประเมินภาวะการรู้คิด</span>
+          {patient && (
+            <span style={{ fontSize: 12, color: 'var(--mint-primary)', fontWeight: 600, background: 'var(--mint-primary-xl)', padding: '2px 10px', borderRadius: 20, border: '1px solid var(--mint-border)' }}>
+              {patient.name} · {patient.age} ปี
+            </span>
+          )}
         </div>
         <div style={{ fontSize: 12, color: 'var(--mint-muted)', fontWeight: 600 }}>ขั้นตอน {Math.min(step,3)}/3</div>
       </div>
@@ -192,10 +212,8 @@ export default function MiniCogQuiz({ onBack }) {
               onTouchMove={onMove} onTouchEnd={() => setDrag(null)}
               style={{ position: 'relative', width: 260, height: 260, margin: '0 auto 24px', userSelect: 'none', touchAction: 'none' }}
             >
-              {/* face */}
               <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'linear-gradient(145deg,#f8fffe,white)', border: '3px solid var(--mint-border)', boxShadow: '0 4px 24px rgba(14,159,142,0.12), inset 0 1px 4px rgba(255,255,255,0.8)' }} />
 
-              {/* ticks */}
               {[...Array(60)].map((_,i) => {
                 const ang = (i*6-90)*(Math.PI/180), maj = i%5===0;
                 const r1 = maj?91:96, r2=103;
@@ -207,7 +225,6 @@ export default function MiniCogQuiz({ onBack }) {
                 );
               })}
 
-              {/* numbers */}
               {CLOCK_NUMS.map((num,i) => {
                 const ang = (i*30-90)*(Math.PI/180), r=108;
                 return (
@@ -231,11 +248,9 @@ export default function MiniCogQuiz({ onBack }) {
                 <div style={{ position:'absolute', top:-11, left:'50%', transform:'translateX(-50%)', width:22, height:22, background:'var(--mint-blue)', borderRadius:'50%', border:'3px solid white', boxShadow:'0 2px 8px rgba(59,130,246,0.4)' }} />
               </div>
 
-              {/* center */}
               <div style={{ position:'absolute', left:130, top:130, width:12, height:12, background:'var(--mint-text)', borderRadius:'50%', transform:'translate(-50%,-50%)', zIndex:10 }} />
             </div>
 
-            {/* angle display */}
             <div style={{ display:'flex', justifyContent:'center', gap:20, marginBottom:20 }}>
               {[['🔵','ชั่วโมง',hourA,'var(--mint-primary)'],['🟣','นาที',minA,'var(--mint-blue)']].map(([em,lb,a,c]) => (
                 <span key={lb} style={{ fontSize:12, color:'var(--mint-muted)', display:'flex', alignItems:'center', gap:4 }}>
@@ -282,6 +297,18 @@ export default function MiniCogQuiz({ onBack }) {
         {/* ── Step 4 Result ── */}
         {step === 4 && result && (
           <Card className="scale-in">
+            {/* patient info banner */}
+            {patient && (
+              <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--mint-primary-xl)', border:'1px solid var(--mint-border)', borderRadius:12, marginBottom:20 }}>
+                <span style={{ fontSize:16 }}>👤</span>
+                <div>
+                  <p style={{ fontSize:13, fontWeight:700, color:'var(--mint-text)' }}>{patient.name}</p>
+                  <p style={{ fontSize:11, color:'var(--mint-muted)' }}>อายุ {patient.age} ปี</p>
+                </div>
+                <div style={{ marginLeft:'auto', fontSize:11, color:'var(--mint-primary)', fontWeight:700 }}>✅ บันทึกแล้ว</div>
+              </div>
+            )}
+
             {/* circle */}
             <div style={{ textAlign:'center', marginBottom:24 }}>
               <div style={{ position:'relative', width:110, height:110, margin:'0 auto 10px' }}>
@@ -302,14 +329,12 @@ export default function MiniCogQuiz({ onBack }) {
               <p style={{ fontSize:11, color:'var(--mint-muted)', letterSpacing:'0.08em', textTransform:'uppercase' }}>คะแนนรวม</p>
             </div>
 
-            {/* status */}
             <div style={{ borderRadius:14, padding:'14px 18px', marginBottom:20, background: result.impaired?'#fff7ed':'#f0fdf9', border:`1.5px solid ${result.impaired?'#fcd34d':'#6ee7d5'}` }}>
               <p style={{ fontWeight:700, textAlign:'center', fontSize:14, color: result.impaired?'#92400e':'#065f46' }}>
                 {result.impaired ? '⚠️ มีภาวะการรู้คิดบกพร่อง (Cognitive Impairment)' : '✅ ผลการประเมินเบื้องต้นอยู่ในเกณฑ์ปกติ'}
               </p>
             </div>
 
-            {/* breakdown */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:20 }}>
               {[['Clock Drawing',result.clockScore,2,'var(--mint-primary)'],['Word Recall',result.recallScore,3,'var(--mint-blue)']].map(([lb,sc,mx,c]) => (
                 <div key={lb} style={{ background:'var(--mint-surface2)', border:'1px solid var(--mint-border2)', borderRadius:12, padding:'14px', textAlign:'center' }}>
