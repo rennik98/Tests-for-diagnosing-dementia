@@ -1,8 +1,23 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 
-const REG_WORDS  = ['ต้นไม้', 'รถยนต์', 'มือ'];
+/* ── Word sets (7 sets × 3 words each) ── */
+const WORD_SETS = [
+  ['กล้วย', 'ผู้นำ', 'หมู่บ้าน'],
+  ['แม่น้ำ', 'กัปตันเรือ', 'ลูกสาว'],
+  ['บ้าน', 'พระอาทิตย์ขึ้น', 'ฤดูกาล'],
+  ['ห้องครัว', 'ประเทศ', 'สวน'],
+  ['สวรรค์', 'แมว', 'เก้าอี้'],
+  ['โต๊ะ', 'เด็ก', 'นิ้ว'],
+  ['รูปภาพ', 'ภูเขา', 'สีเขียว'],
+];
+
+const WORD_SET_LABELS = [
+  'ชุดคำที่ 1', 'ชุดคำที่ 2', 'ชุดคำที่ 3',
+  'ชุดคำที่ 4', 'ชุดคำที่ 5', 'ชุดคำที่ 6',
+  'ชุดคำที่ 7*',
+];
+
 const DAYS_ORDER = ['อาทิตย์','เสาร์','ศุกร์','พฤหัสบดี','พุธ','อังคาร','จันทร์'];
-const CALC_ANS   = [93, 86, 79];
 const ORI_Q      = [
   'วันนี้เป็นวันอะไร?',
   'วันนี้วันที่เท่าไร?',
@@ -61,15 +76,6 @@ const SubQ = ({ label, val, onChange }) => (
   </div>
 );
 
-const FocusInput = ({ value, onChange, placeholder, style: extraStyle, ...rest }) => (
-  <input value={value} onChange={onChange} placeholder={placeholder}
-    style={{ width:'100%', padding:'12px 14px', background:'var(--mint-surface2)', border:'1.5px solid var(--mint-border)', borderRadius:11, fontSize:14, fontWeight:700, color:'var(--mint-text)', outline:'none', boxSizing:'border-box', transition:'border-color 0.18s', ...extraStyle }}
-    onFocus={e => e.target.style.borderColor='var(--mint-primary)'}
-    onBlur={e  => e.target.style.borderColor='var(--mint-border)'}
-    {...rest}
-  />
-);
-
 const ActionBtn = ({ children, onClick, variant='primary' }) => {
   const styles = {
     primary: { background:'linear-gradient(135deg,var(--mint-primary),var(--mint-primary-l))', color:'white', border:'none', boxShadow:'0 6px 18px rgba(14,159,142,0.28)' },
@@ -86,13 +92,36 @@ const ActionBtn = ({ children, onClick, variant='primary' }) => {
   );
 };
 
-
-/* ── Freehand Drawing Canvas (reusable) ── */
-function DrawingCanvas({ width=260, height=200, onScoreSelect }) {
-  const canvasRef  = useRef(null);
-  const drawing    = useRef(false);
+/* ── Improved Freehand Drawing Canvas with undo + always-visible ── */
+function DrawingCanvas({ width=280, height=200, onScoreSelect }) {
+  const canvasRef   = useRef(null);
+  const drawing     = useRef(false);
+  const strokesRef  = useRef([]);   // completed strokes
+  const currentRef  = useRef([]);   // points in current stroke
   const [confirmed, setConfirmed] = React.useState(false);
   const [isEmpty,   setIsEmpty]   = React.useState(true);
+
+  const redrawAll = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, width, height);
+    ctx.strokeStyle = '#0f2b28';
+    ctx.lineWidth   = 2.5;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+    for (const stroke of strokesRef.current) {
+      if (stroke.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(stroke[0].x, stroke[0].y);
+      for (let i = 1; i < stroke.length; i++) {
+        ctx.lineTo(stroke[i].x, stroke[i].y);
+      }
+      ctx.stroke();
+    }
+  }, [width, height]);
+
+  useEffect(() => { redrawAll(); }, [redrawAll]);
 
   const getPos = (e, canvas) => {
     const rect   = canvas.getBoundingClientRect();
@@ -105,76 +134,160 @@ function DrawingCanvas({ width=260, height=200, onScoreSelect }) {
   const startDraw = (e) => {
     if (confirmed) return; e.preventDefault();
     drawing.current = true;
+    currentRef.current = [];
     const canvas = canvasRef.current; const ctx = canvas.getContext('2d');
     const pos = getPos(e, canvas);
+    currentRef.current.push(pos);
     ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
     ctx.strokeStyle = '#0f2b28'; ctx.lineWidth = 2.5;
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   };
+
   const draw = (e) => {
     if (!drawing.current || confirmed) return; e.preventDefault();
     const canvas = canvasRef.current; const ctx = canvas.getContext('2d');
     const pos = getPos(e, canvas);
-    ctx.lineTo(pos.x, pos.y); ctx.stroke(); setIsEmpty(false);
+    currentRef.current.push(pos);
+    ctx.lineTo(pos.x, pos.y); ctx.stroke();
+    setIsEmpty(false);
   };
-  const stopDraw = () => { drawing.current = false; };
+
+  const stopDraw = () => {
+    if (!drawing.current) return;
+    drawing.current = false;
+    if (currentRef.current.length > 0) {
+      strokesRef.current = [...strokesRef.current, [...currentRef.current]];
+      currentRef.current = [];
+    }
+  };
+
+  const handleUndo = () => {
+    if (strokesRef.current.length === 0) return;
+    strokesRef.current = strokesRef.current.slice(0, -1);
+    redrawAll();
+    setIsEmpty(strokesRef.current.length === 0);
+  };
 
   const handleClear = () => {
-    const canvas = canvasRef.current; const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, width, height); setIsEmpty(true);
+    strokesRef.current = [];
+    currentRef.current = [];
+    redrawAll();
+    setIsEmpty(true);
   };
 
-  if (confirmed) {
-    return (
-      <div>
-        <canvas ref={canvasRef} width={width} height={height}
-          style={{ display:'block', border:'1.5px solid var(--mint-border2)', borderRadius:14, margin:'0 auto 16px', opacity:0.88, background:'white' }}
-        />
-        <p style={{ fontSize:13,fontWeight:700,color:'var(--mint-text)',marginBottom:10,textAlign:'center' }}>ให้คะแนนการวาดภาพ</p>
-        <div style={{ display:'flex',gap:8,marginBottom:10 }}>
-          {[0,1,2].map(n=>(
-            <button key={n} onClick={()=>onScoreSelect(n)} style={{
-              flex:1, padding:'14px 6px', borderRadius:12, fontSize:14, fontWeight:800,
-              display:'flex', flexDirection:'column', alignItems:'center', gap:3,
-              background: n===2 ? 'var(--mint-primary-xl)' : n===1 ? '#fef9c3' : '#fff1f1',
-              border: `1.5px solid ${n===2?'var(--mint-primary)':n===1?'#fcd34d':'#fca5a5'}`,
-              color: n===2 ? 'var(--mint-primary)' : n===1 ? '#92400e' : '#dc2626',
-              cursor:'pointer', transition:'all 0.18s',
-            }}
-              onMouseOver={e=>e.currentTarget.style.opacity='0.85'}
-              onMouseOut={e=>e.currentTarget.style.opacity='1'}
-            >
-              <span style={{fontSize:20}}>{n===2?'✓✓':n===1?'△':'✗'}</span>
-              <span>{n} คะแนน</span>
-              <span style={{fontSize:10,opacity:0.7}}>{n===2?'สมบูรณ์':n===1?'บางส่วน':'ไม่ถูกต้อง'}</span>
-            </button>
-          ))}
-        </div>
-        <button onClick={()=>{setConfirmed(false);setIsEmpty(false);}} style={{
-          width:'100%',padding:'8px',borderRadius:9,background:'none',border:'none',color:'var(--mint-muted)',fontSize:12,cursor:'pointer',
-        }}>← วาดใหม่</button>
-      </div>
-    );
-  }
-
   return (
-    <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
-      <canvas ref={canvasRef} width={width} height={height}
-        style={{ display:'block', border:'1.5px dashed var(--mint-border)', borderRadius:14, cursor:'crosshair', background:'white', touchAction:'none' }}
-        onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
-        onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+      {/* Canvas always visible */}
+      <canvas
+        ref={canvasRef}
+        width={width}
+        height={height}
+        style={{
+          display:'block',
+          border: confirmed ? '1.5px solid var(--mint-primary)' : '1.5px dashed var(--mint-border)',
+          borderRadius:14,
+          cursor: confirmed ? 'default' : 'crosshair',
+          background:'white',
+          touchAction:'none',
+          opacity: confirmed ? 0.92 : 1,
+          transition: 'border-color 0.2s, opacity 0.2s',
+          margin: '0 auto',
+        }}
+        onMouseDown={!confirmed ? startDraw : undefined}
+        onMouseMove={!confirmed ? draw : undefined}
+        onMouseUp={!confirmed ? stopDraw : undefined}
+        onMouseLeave={!confirmed ? stopDraw : undefined}
+        onTouchStart={!confirmed ? startDraw : undefined}
+        onTouchMove={!confirmed ? draw : undefined}
+        onTouchEnd={!confirmed ? stopDraw : undefined}
       />
-      <div style={{ display:'flex',gap:8 }}>
-        <button onClick={handleClear} style={{
-          flex:1,padding:'10px',borderRadius:10,fontSize:13,fontWeight:700,
-          background:'var(--mint-surface2)',border:'1.5px solid var(--mint-border)',color:'var(--mint-muted)',cursor:'pointer',
-        }}>🗑️ ล้างใหม่</button>
-        <button onClick={()=>setConfirmed(true)} disabled={isEmpty} style={{
-          flex:2,padding:'10px',borderRadius:10,fontSize:13,fontWeight:700,
-          background:isEmpty?'var(--mint-border2)':'linear-gradient(135deg,var(--mint-primary),var(--mint-primary-l))',
-          color:isEmpty?'var(--mint-muted)':'white',border:'none',
-          cursor:isEmpty?'not-allowed':'pointer',transition:'all 0.2s',
-        }}>ยืนยันการวาด ✓</button>
+
+      {!confirmed ? (
+        /* ── Drawing controls ── */
+        <div style={{ display:'flex', gap:8 }}>
+          <button onClick={handleUndo} disabled={isEmpty} style={{
+            flex:1, padding:'10px', borderRadius:10, fontSize:13, fontWeight:700,
+            background: isEmpty ? 'var(--mint-border2)' : 'var(--mint-surface2)',
+            border:'1.5px solid var(--mint-border)',
+            color: isEmpty ? 'var(--mint-muted)' : 'var(--mint-text2)',
+            cursor: isEmpty ? 'not-allowed' : 'pointer', transition:'all 0.18s',
+          }}>↩ ย้อนกลับ</button>
+          <button onClick={handleClear} disabled={isEmpty} style={{
+            flex:1, padding:'10px', borderRadius:10, fontSize:13, fontWeight:700,
+            background: isEmpty ? 'var(--mint-border2)' : 'var(--mint-surface2)',
+            border:'1.5px solid var(--mint-border)', color:'var(--mint-muted)',
+            cursor: isEmpty ? 'not-allowed' : 'pointer', transition:'all 0.18s',
+          }}>🗑️ ล้างใหม่</button>
+          <button onClick={()=>setConfirmed(true)} disabled={isEmpty} style={{
+            flex:2, padding:'10px', borderRadius:10, fontSize:13, fontWeight:700,
+            background: isEmpty ? 'var(--mint-border2)' : 'linear-gradient(135deg,var(--mint-primary),var(--mint-primary-l))',
+            color: isEmpty ? 'var(--mint-muted)' : 'white', border:'none',
+            cursor: isEmpty ? 'not-allowed' : 'pointer', transition:'all 0.2s',
+          }}>ยืนยันการวาด ✓</button>
+        </div>
+      ) : (
+        /* ── Scoring controls ── */
+        <div>
+          <p style={{ fontSize:13, fontWeight:700, color:'var(--mint-text)', marginBottom:10, textAlign:'center' }}>ให้คะแนนการวาดภาพ</p>
+          <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+            {[0,1,2].map(n=>(
+              <button key={n} onClick={()=>onScoreSelect(n)} style={{
+                flex:1, padding:'14px 6px', borderRadius:12, fontSize:14, fontWeight:800,
+                display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+                background: n===2 ? 'var(--mint-primary-xl)' : n===1 ? '#fef9c3' : '#fff1f1',
+                border: `1.5px solid ${n===2?'var(--mint-primary)':n===1?'#fcd34d':'#fca5a5'}`,
+                color: n===2 ? 'var(--mint-primary)' : n===1 ? '#92400e' : '#dc2626',
+                cursor:'pointer', transition:'all 0.18s',
+              }}
+                onMouseOver={e=>e.currentTarget.style.opacity='0.85'}
+                onMouseOut={e=>e.currentTarget.style.opacity='1'}
+              >
+                <span style={{fontSize:20}}>{n===2?'✓✓':n===1?'△':'✗'}</span>
+                <span>{n} คะแนน</span>
+                <span style={{fontSize:10,opacity:0.7}}>{n===2?'สมบูรณ์':n===1?'บางส่วน':'ไม่ถูกต้อง'}</span>
+              </button>
+            ))}
+          </div>
+          <button onClick={()=>{ setConfirmed(false); }} style={{
+            width:'100%', padding:'8px', borderRadius:9, background:'none', border:'none',
+            color:'var(--mint-muted)', fontSize:12, cursor:'pointer',
+          }}>← วาดใหม่ / แก้ไข</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Word Set Picker ── */
+function WordSetPicker({ selectedSet, onSelect }) {
+  return (
+    <div style={{ marginBottom:14 }}>
+      <p style={{ fontSize:12, color:'var(--mint-text2)', fontWeight:700, marginBottom:8 }}>
+        เลือกชุดคำศัพท์
+        <span style={{ fontSize:10, color:'var(--mint-muted)', fontWeight:400, marginLeft:6 }}>
+          (กดสุ่มหรือเลือกเอง)
+        </span>
+      </p>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6, marginBottom:8 }}>
+        {WORD_SET_LABELS.map((label, i) => (
+          <button key={i} onClick={() => onSelect(i)} style={{
+            padding:'8px 4px', borderRadius:9, fontSize:11, fontWeight:700,
+            border:`1.5px solid ${selectedSet===i ? 'var(--mint-primary)' : 'var(--mint-border)'}`,
+            background: selectedSet===i ? 'var(--mint-primary-xl)' : 'var(--mint-surface2)',
+            color: selectedSet===i ? 'var(--mint-primary)' : 'var(--mint-muted)',
+            cursor:'pointer', transition:'all 0.15s',
+          }}>
+            {label}
+          </button>
+        ))}
+        <button onClick={() => onSelect(Math.floor(Math.random() * WORD_SETS.length))} style={{
+          padding:'8px 4px', borderRadius:9, fontSize:11, fontWeight:700,
+          border:'1.5px solid var(--mint-border)',
+          background:'linear-gradient(135deg,var(--mint-primary),var(--mint-primary-l))',
+          color:'white', cursor:'pointer', transition:'all 0.15s',
+        }}>
+          🎲 สุ่ม
+        </button>
       </div>
     </div>
   );
@@ -182,14 +295,25 @@ function DrawingCanvas({ width=260, height=200, onScoreSelect }) {
 
 /* ── main ── */
 export default function TMSEQuiz({ onBack, onComplete, patient }) {
+  // Pick a random word set on mount
+  const [wordSetIdx, setWordSetIdx] = useState(() => Math.floor(Math.random() * WORD_SETS.length));
+  const REG_WORDS = WORD_SETS[wordSetIdx];
+
   const [oriS,  setOriS]  = useState(Array(6).fill(null));
   const [regS,  setRegS]  = useState(null);
   const [attS,  setAttS]  = useState(null);
   const [calcChk, setCalcChk] = useState([false,false,false]);
   const [calcS, setCalcS] = useState(null);
   const [langS, setLangS] = useState({ naming1:null, naming2:null, repeat:null, commands:Array(3).fill(null), read:null, copy:null, similarity:null });
-  const [recS,  setRecS]  = useState(Array(3).fill(null)); // true/false per word
+  const [recS,  setRecS]  = useState(Array(3).fill(null));
   const [done,  setDone]  = useState(false);
+
+  // Reset recall scores when word set changes
+  const handleWordSetChange = (idx) => {
+    setWordSetIdx(idx);
+    setRegS(null);
+    setRecS(Array(3).fill(null));
+  };
 
   const oriTotal  = oriS.filter(v=>v===1).length;
   const langTotal = (langS.naming1??0)+(langS.naming2??0)+(langS.repeat??0)+langS.commands.reduce((a,v)=>a+(v??0),0)+(langS.read??0)+(langS.copy??0)+(langS.similarity??0);
@@ -197,8 +321,8 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
   const total     = oriTotal+(regS??0)+(attS??0)+(calcS??0)+langTotal+recTotal;
   const impaired  = total < 24;
 
-  const setCmd   = (i, v) => { const c=[...langS.commands]; c[i]=v; setLangS(s=>({...s,commands:c})); };
-  const setRec   = (i, v) => { const a=[...recS]; a[i]=v; setRecS(a); };
+  const setCmd = (i, v) => { const c=[...langS.commands]; c[i]=v; setLangS(s=>({...s,commands:c})); };
+  const setRec = (i, v) => { const a=[...recS]; a[i]=v; setRecS(a); };
 
   const handleFinish = () => {
     setDone(true);
@@ -253,6 +377,18 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
               </div>
             </div>
           )}
+
+          {/* Word set used */}
+          <div style={{ display:'flex',alignItems:'center',gap:8,padding:'8px 14px',background:'var(--mint-surface2)',border:'1px solid var(--mint-border2)',borderRadius:10,marginBottom:16 }}>
+            <span style={{ fontSize:11,color:'var(--mint-muted)' }}>ชุดคำที่ใช้:</span>
+            <span style={{ fontSize:11,fontWeight:700,color:'var(--mint-primary)' }}>{WORD_SET_LABELS[wordSetIdx]}</span>
+            <div style={{ display:'flex',gap:4,marginLeft:4 }}>
+              {REG_WORDS.map(w=>(
+                <span key={w} style={{ fontSize:10,background:'var(--mint-primary-xl)',color:'var(--mint-primary)',padding:'1px 6px',borderRadius:6,fontWeight:700 }}>{w}</span>
+              ))}
+            </div>
+          </div>
+
           <div style={{ textAlign:'center',marginBottom:28 }}>
             <div style={{ position:'relative',width:130,height:130,margin:'0 auto 12px' }}>
               <svg width="130" height="130" style={{ position:'absolute',inset:0 }}>
@@ -327,6 +463,9 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
 
         {/* 2. Registration */}
         <Section num="2" title="การลงทะเบียนคำศัพท์ (Registration)" max={3} score={regS??0}>
+          {/* Word set picker */}
+          <WordSetPicker selectedSet={wordSetIdx} onSelect={handleWordSetChange} />
+
           <div style={{ background:'var(--mint-primary-xl)',border:'1px solid var(--mint-border)',borderRadius:14,padding:14,marginBottom:14 }}>
             <p style={{ fontSize:13,color:'var(--mint-text2)',fontStyle:'italic',textAlign:'center',lineHeight:1.7,marginBottom:12 }}>
               "เดี๋ยวจะบอกชื่อของ 3 อย่าง ให้ฟังดีๆ จะบอกเพียงครั้งเดียว เมื่อพูดจบแล้วให้พูดตาม"
@@ -351,7 +490,7 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
           </div>
         </Section>
 
-        {/* 3. Attention — CHECKBOX */}
+        {/* 3. Attention */}
         <Section num="3" title="ความสนใจ (Attention)" max={5} score={attS??0}>
           <p style={{ fontSize:13,color:'var(--mint-text2)',marginBottom:4 }}>ให้ผู้ถูกทดสอบบอกวันถอยหลัง เริ่มจาก <strong>อาทิตย์</strong></p>
           <p style={{ fontSize:11,color:'var(--mint-muted)',marginBottom:12 }}>กดจำนวนวันที่ตอบถูกต้องต่อเนื่องจากต้น (หยุดนับเมื่อตอบผิดครั้งแรก, max 5)</p>
@@ -397,13 +536,12 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
           )}
         </Section>
 
-        {/* 4. Calculation — CHECKBOX */}
+        {/* 4. Calculation */}
         <Section num="4" title="การคิดคำนวณ (Calculation)" max={3} score={calcS??0}>
           <p style={{ fontSize:13,color:'var(--mint-text2)',marginBottom:4 }}>คิดเลข <strong>100 − 7</strong> ไปเรื่อยๆ 3 ครั้ง</p>
           <p style={{ fontSize:11,color:'var(--mint-muted)',marginBottom:14 }}>เฉลย: 100 → 93 → 86 → 79</p>
           <div style={{ display:'flex',flexDirection:'column',gap:8,marginBottom:14 }}>
             {[[100,93,0],[93,86,1],[86,79,2]].map(([from,to,i])=>{
-              const checked = calcS !== null && i < calcS;
               const isChecked = calcChk[i];
               return (
                 <button key={i} onClick={()=>{ const a=[...calcChk]; a[i]=!a[i]; setCalcChk(a); const s=a.filter(Boolean).length; setCalcS(s); }} style={{
@@ -486,11 +624,13 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
               {langS.copy===null
                 ? <DrawingCanvas width={280} height={180} onScoreSelect={v=>setLangS(s=>({...s,copy:v}))} />
                 : (
-                  <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:langS.copy===2?'var(--mint-primary-xl)':langS.copy===1?'#fef9c3':'#fff1f1',border:`1px solid ${langS.copy===2?'var(--mint-primary)':langS.copy===1?'#fcd34d':'#fca5a5'}`,borderRadius:10 }}>
-                    <span style={{ fontWeight:700,fontSize:14,color:langS.copy===2?'var(--mint-primary)':langS.copy===1?'#92400e':'#dc2626' }}>
-                      {langS.copy===2?'✓✓ 2 คะแนน (สมบูรณ์)':langS.copy===1?'△ 1 คะแนน (บางส่วน)':'✗ 0 คะแนน'}
-                    </span>
-                    <button onClick={()=>setLangS(s=>({...s,copy:null}))} style={{ fontSize:11,color:'var(--mint-muted)',background:'none',border:'none',cursor:'pointer' }}>แก้ไข</button>
+                  <div>
+                    <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:langS.copy===2?'var(--mint-primary-xl)':langS.copy===1?'#fef9c3':'#fff1f1',border:`1px solid ${langS.copy===2?'var(--mint-primary)':langS.copy===1?'#fcd34d':'#fca5a5'}`,borderRadius:10 }}>
+                      <span style={{ fontWeight:700,fontSize:14,color:langS.copy===2?'var(--mint-primary)':langS.copy===1?'#92400e':'#dc2626' }}>
+                        {langS.copy===2?'✓✓ 2 คะแนน (สมบูรณ์)':langS.copy===1?'△ 1 คะแนน (บางส่วน)':'✗ 0 คะแนน'}
+                      </span>
+                      <button onClick={()=>setLangS(s=>({...s,copy:null}))} style={{ fontSize:11,color:'var(--mint-muted)',background:'none',border:'none',cursor:'pointer' }}>แก้ไข</button>
+                    </div>
                   </div>
                 )
               }
@@ -506,11 +646,18 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
           </div>
         </Section>
 
-        {/* 6. Recall — TRUE/FALSE per word */}
+        {/* 6. Recall */}
         <Section num="6" title="การระลึก (Recall)" max={3} score={recTotal}>
-          <p style={{ fontSize:13,color:'var(--mint-text2)',marginBottom:14 }}>
+          <p style={{ fontSize:13,color:'var(--mint-text2)',marginBottom:8 }}>
             ผู้ถูกทดสอบระลึกคำแต่ละคำได้หรือไม่?
           </p>
+          {/* reminder of which set is active */}
+          <div style={{ display:'flex',gap:6,marginBottom:12,padding:'8px 12px',background:'var(--mint-primary-xl)',border:'1px solid var(--mint-border)',borderRadius:10 }}>
+            <span style={{ fontSize:11,color:'var(--mint-primary)',fontWeight:700 }}>{WORD_SET_LABELS[wordSetIdx]}:</span>
+            {REG_WORDS.map(w=>(
+              <span key={w} style={{ fontSize:11,color:'var(--mint-text)',fontWeight:800 }}>{w}</span>
+            ))}
+          </div>
           <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
             {REG_WORDS.map((word, i) => (
               <div key={word} style={{

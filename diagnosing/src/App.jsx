@@ -230,6 +230,191 @@ const PatientForm = ({ quizType, onConfirm, onCancel }) => {
   );
 };
 
+/* ── Result Summary Modal ────────────────────────────────────────────────────*/
+const ResultSummaryModal = ({ result, patient, onClose, onViewAll }) => {
+  if (!result) return null;
+
+  const isMini     = result.type === 'Mini-Cog';
+  const impaired   = result.impaired;
+  const accent     = isMini ? 'var(--mint-primary)' : 'var(--mint-blue)';
+  const accentXl   = isMini ? 'var(--mint-primary-xl)' : 'var(--mint-blue-xl)';
+  const grad       = isMini
+    ? 'linear-gradient(135deg, var(--mint-primary), var(--mint-primary-l))'
+    : 'linear-gradient(135deg, var(--mint-blue), #60a5fa)';
+
+  const pct = (result.totalScore / result.maxScore) * 100;
+  const circumference = 2 * Math.PI * 52; // r=52
+
+  /* TMSE breakdown rows */
+  const tmseBreakdown = result.breakdown ? [
+    { label: 'Orientation',  score: result.breakdown.orientation,  max: 6  },
+    { label: 'Registration', score: result.breakdown.registration, max: 3  },
+    { label: 'Attention',    score: result.breakdown.attention,    max: 5  },
+    { label: 'Calculation',  score: result.breakdown.calculation,  max: 3  },
+    { label: 'Language',     score: result.breakdown.language,     max: 10 },
+    { label: 'Recall',       score: result.breakdown.recall,       max: 3  },
+  ] : [];
+
+  /* Mini-Cog breakdown */
+  const miniBreakdown = result.breakdown ? [
+    { label: 'Clock Drawing', score: result.breakdown.clockDrawing, max: 2 },
+    { label: 'Word Recall',   score: result.breakdown.wordRecall,   max: 3 },
+  ] : [];
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 300,
+      background: 'rgba(15,43,40,0.6)', backdropFilter: 'blur(8px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 16, overflowY: 'auto',
+    }}>
+      <div style={{
+        background: 'white', borderRadius: 26, width: '100%', maxWidth: 460,
+        boxShadow: '0 24px 80px rgba(14,159,142,0.25)',
+        border: '1.5px solid var(--mint-border)',
+        animation: 'scaleIn 0.32s ease both',
+        overflow: 'hidden',
+        my: 16,
+      }}>
+        {/* Header band */}
+        <div style={{
+          background: grad,
+          padding: '22px 24px 20px',
+          position: 'relative', overflow: 'hidden',
+        }}>
+          <div style={{ position: 'absolute', right: -20, top: -20, opacity: 0.12 }}>
+            <Cross s={120} c="white" />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>
+              {isMini ? '⚡' : '🧠'}
+            </div>
+            <div>
+              <p style={{ fontSize: 16, fontWeight: 800, color: 'white' }}>ผลการประเมิน {result.type}</p>
+              {patient && <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)' }}>{patient.name} · อายุ {patient.age} ปี</p>}
+            </div>
+            <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, background: 'rgba(255,255,255,0.25)', color: 'white', padding: '4px 10px', borderRadius: 20 }}>
+              ✅ บันทึกแล้ว
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: '24px 24px 20px' }}>
+          {/* Score ring + verdict */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 22 }}>
+            {/* Ring */}
+            <div style={{ position: 'relative', width: 110, height: 110, flexShrink: 0 }}>
+              <svg width="110" height="110" style={{ position: 'absolute', inset: 0 }}>
+                <circle cx="55" cy="55" r="52" fill="none" stroke="var(--mint-border2)" strokeWidth="7"/>
+                <circle cx="55" cy="55" r="52" fill="none"
+                  stroke={impaired ? 'var(--mint-warn)' : accent}
+                  strokeWidth="7"
+                  strokeDasharray={`${(pct / 100) * circumference} ${circumference}`}
+                  strokeLinecap="round"
+                  transform="rotate(-90 55 55)"
+                  style={{ transition: 'stroke-dasharray 1s ease' }}
+                />
+              </svg>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 28, fontWeight: 800, color: impaired ? 'var(--mint-warn)' : accent, lineHeight: 1 }}>
+                  {result.totalScore}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>/ {result.maxScore}</span>
+              </div>
+            </div>
+
+            {/* Verdict box */}
+            <div style={{ flex: 1 }}>
+              <div style={{
+                borderRadius: 14, padding: '14px 16px',
+                background: impaired ? '#fff7ed' : '#f0fdf9',
+                border: `1.5px solid ${impaired ? '#fcd34d' : '#6ee7d5'}`,
+                marginBottom: 10,
+              }}>
+                <p style={{ fontWeight: 800, fontSize: 14, color: impaired ? '#92400e' : '#065f46', marginBottom: 4 }}>
+                  {impaired ? '⚠️ พบภาวะบกพร่อง' : '✅ อยู่ในเกณฑ์ปกติ'}
+                </p>
+                <p style={{ fontSize: 12, color: impaired ? '#b45309' : '#047857', lineHeight: 1.5 }}>
+                  {isMini
+                    ? (impaired ? 'คะแนน ≤ 3 → มีแนวโน้ม Cognitive Impairment' : 'คะแนน > 3 → ไม่พบสัญญาณผิดปกติ')
+                    : (impaired ? 'คะแนน < 24 → มีแนวโน้ม Cognitive Impairment' : 'คะแนน ≥ 24 → ไม่พบสัญญาณผิดปกติ')
+                  }
+                </p>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--mint-muted)', lineHeight: 1.5 }}>
+                * เป็นการคัดกรองเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์
+              </p>
+            </div>
+          </div>
+
+          {/* Breakdown */}
+          <div style={{ background: 'var(--mint-surface2)', border: '1px solid var(--mint-border2)', borderRadius: 16, padding: '16px', marginBottom: 20 }}>
+            <p style={{ fontSize: 11, color: 'var(--mint-muted)', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 12 }}>
+              คะแนนแยกหมวด
+            </p>
+
+            {isMini ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {miniBreakdown.map(({ label, score, max }) => (
+                  <div key={label} style={{ background: 'white', border: '1px solid var(--mint-border2)', borderRadius: 12, padding: '12px', textAlign: 'center' }}>
+                    <p style={{ fontSize: 22, fontWeight: 800, color: accent }}>
+                      {score}<span style={{ fontSize: 12, fontWeight: 400, color: 'var(--mint-muted)' }}>/{max}</span>
+                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--mint-muted)', marginTop: 3 }}>{label}</p>
+                    {/* mini bar */}
+                    <div style={{ height: 5, borderRadius: 3, background: 'var(--mint-border2)', marginTop: 8, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 3, background: accent, width: `${(score/max)*100}%`, transition: 'width 0.8s ease' }}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {tmseBreakdown.map(({ label, score, max }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 12, color: 'var(--mint-text2)', width: 82, flexShrink: 0 }}>{label}</span>
+                    <div style={{ flex: 1, height: 7, borderRadius: 4, background: 'var(--mint-border2)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 4, background: `linear-gradient(90deg, ${accent}, #60a5fa)`, width: `${(score/max)*100}%`, transition: 'width 0.8s ease' }}/>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: accent, width: 36, textAlign: 'right' }}>{score}/{max}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button
+              onClick={onViewAll}
+              style={{
+                width: '100%', padding: '13px', borderRadius: 13, fontSize: 14, fontWeight: 700,
+                background: grad, color: 'white', border: 'none', cursor: 'pointer',
+                boxShadow: isMini ? '0 6px 18px rgba(14,159,142,0.3)' : '0 6px 18px rgba(59,130,246,0.3)',
+                transition: 'opacity 0.2s',
+              }}
+              onMouseOver={e => e.currentTarget.style.opacity = '0.88'}
+              onMouseOut={e  => e.currentTarget.style.opacity = '1'}
+            >
+              📋 ดูผลทั้งหมด
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                width: '100%', padding: '12px', borderRadius: 13, fontSize: 14, fontWeight: 700,
+                background: 'var(--mint-surface2)', border: '1.5px solid var(--mint-border)',
+                color: 'var(--mint-text2)', cursor: 'pointer',
+              }}
+            >
+              ← กลับหน้าหลัก
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ── CSV Export ──────────────────────────────────────────────────────────────*/
 function exportCSV(results) {
   const BOM = '\uFEFF';
@@ -408,10 +593,11 @@ const ResultsPage = ({ results, onExport, onClear }) => (
 
 /* ── App ─────────────────────────────────────────────────────────────────────*/
 export default function App() {
-  const [tab,        setTab]      = useState('home');
-  const [quiz,       setQuiz]     = useState(null);
-  const [showForm,   setShowForm] = useState(null);
-  const [patient,    setPatient]  = useState(null);
+  const [tab,           setTab]          = useState('home');
+  const [quiz,          setQuiz]         = useState(null);
+  const [showForm,      setShowForm]     = useState(null);
+  const [patient,       setPatient]      = useState(null);
+  const [pendingResult, setPendingResult] = useState(null); // shows summary modal
 
   const STORAGE_KEY = 'dementia_eval_results';
   const [allResults, setAllResults] = useState(() => {
@@ -444,7 +630,7 @@ export default function App() {
       now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })
       + ' ' + now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 
-    saveResults(prev => [...prev, {
+    const newRecord = {
       name:       patient?.name ?? 'ไม่ระบุ',
       age:        patient?.age  ?? '-',
       type:       scoreData.type,
@@ -453,13 +639,28 @@ export default function App() {
       impaired:   scoreData.impaired,
       breakdown:  scoreData.breakdown,
       datetime,
-    }]);
+    };
+
+    saveResults(prev => [...prev, newRecord]);
+
+    // Show summary modal instead of going straight home
+    setPendingResult({ ...scoreData, datetime });
     setQuiz(null);
+  };
+
+  const handleBack = () => { setQuiz(null); setPatient(null); setTab('home'); };
+
+  const handleSummaryClose = () => {
+    setPendingResult(null);
     setPatient(null);
     setTab('home');
   };
 
-  const handleBack = () => { setQuiz(null); setPatient(null); setTab('home'); };
+  const handleSummaryViewAll = () => {
+    setPendingResult(null);
+    setPatient(null);
+    setTab('results');
+  };
 
   if (quiz === 'minicog') return <MiniCogQuiz patient={patient} onBack={handleBack} onComplete={handleComplete} />;
   if (quiz === 'tmse')    return <TMSEQuiz    patient={patient} onBack={handleBack} onComplete={handleComplete} />;
@@ -472,6 +673,16 @@ export default function App() {
           quizType={showForm}
           onConfirm={handleFormConfirm}
           onCancel={() => setShowForm(null)}
+        />
+      )}
+
+      {/* Result Summary Modal */}
+      {pendingResult && (
+        <ResultSummaryModal
+          result={pendingResult}
+          patient={patient}
+          onClose={handleSummaryClose}
+          onViewAll={handleSummaryViewAll}
         />
       )}
 
@@ -534,7 +745,6 @@ export default function App() {
         {/* HOME */}
         {tab === 'home' && (
           <div className="fade-up">
-            {/* Hero — responsive: 2 cols on wide, 1 col on mobile */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
@@ -616,7 +826,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Info cards — responsive grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 14 }}>
               <InfoCard icon="🔬" title="Evidence-Based" desc="ทั้ง Mini-Cog และ TMSE ผ่านการรับรองและตีพิมพ์ในวารสารการแพทย์ระดับสากล" />
               <InfoCard icon="🛡️" title="ความเป็นส่วนตัว" desc="ไม่มีการบันทึกหรือส่งข้อมูลใดๆ ออกจากอุปกรณ์ของคุณ ปลอดภัย 100%" />
@@ -676,7 +885,7 @@ export default function App() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Cross s={12} />
-          <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>BrainCheck — เครื่องมือคัดกรองเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์</span>
+          <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>DementiaEval — เครื่องมือคัดกรองเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์</span>
         </div>
         <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>Mini-Cog™ © S. Borson</span>
       </footer>
