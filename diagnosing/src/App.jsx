@@ -762,9 +762,9 @@ export default function App() {
                   </Tag>
                 </div>
                 <h1 style={{ fontFamily: "'Lora','Sarabun',serif", fontSize: 'clamp(32px,6vw,52px)', fontWeight: 600, lineHeight: 1.15, color: 'var(--mint-text)', marginBottom: 16 }}>
-                  ประเมินสุขภาพ<br />
-                  <span style={{ color: 'var(--mint-primary)', fontStyle: 'italic' }}>สมอง </span>
-                  <span style={{ color: 'var(--mint-text)' }}>ด้วย</span><br />
+                  ประเมินสุขภาพ
+                  <span style={{ color: 'var(--mint-primary)', fontStyle: 'italic' }}>สมอง<br /> </span>
+                  <span style={{ color: 'var(--mint-text)' }}>ด้วย</span>
                   มาตรฐานสากล
                 </h1>
                 <p style={{ fontSize: 14, color: 'var(--mint-text2)', lineHeight: 1.8, marginBottom: 28, maxWidth: 420 }}>
@@ -846,7 +846,7 @@ export default function App() {
       <footer style={{ borderTop: '1px solid var(--mint-border)', padding: '14px 16px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', background: 'white', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Cross s={12} />
-          <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>BrainCheck — เครื่องมือคัดกรองเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์</span>
+          <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>DementiaEval — เครื่องมือคัดกรองเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์</span>
         </div>
         <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>Mini-Cog™ © S. Borson</span>
       </footer>
