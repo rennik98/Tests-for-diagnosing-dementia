@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import nurseImg from './assets/nurse.jpg';
 
 /* ── useTimer hook ── */
 function useTimer(autoStart = false) {
@@ -514,7 +515,16 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
 
         {/* 1. Orientation */}
         <Section num="1" title="การรับรู้สภาพแวดล้อม (Orientation)" max={6} score={oriTotal}>
-          {ORI_Q.map((q,i) => <SubQ key={i} label={q} val={oriS[i]} onChange={v=>{const a=[...oriS];a[i]=v;setOriS(a);}} />)}
+          {ORI_Q.map((q,i) => (
+            <div key={i}>
+                {i === 5 && (
+  <div style={{ display:'flex', justifyContent:'center', marginBottom:12 }}>
+    <img src={nurseImg} alt="nurse" style={{ width:'100%', maxWidth:320, borderRadius:16, border:'1.5px solid var(--mint-border)', boxShadow:'var(--shadow-md)', display:'block' }} />
+  </div>
+)}
+              <SubQ label={q} val={oriS[i]} onChange={v=>{const a=[...oriS];a[i]=v;setOriS(a);}} />
+            </div>
+          ))}
         </Section>
 
         {/* 2. Registration */}

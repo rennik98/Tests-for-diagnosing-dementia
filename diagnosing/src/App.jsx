@@ -448,6 +448,7 @@ async function loadFromSheets() {
   let json;
   try { json = JSON.parse(text); } catch { throw new Error('Invalid response: ' + text.slice(0, 100)); }
   if (!json.success) throw new Error(json.error || 'Unknown error');
+  console.log('Raw rows from Sheets:', JSON.stringify(json.data?.[0]));
   return (json.data || []).map(row => ({
     name:       String(row[1] ?? ''),
     age:        row[2],
@@ -455,7 +456,24 @@ async function loadFromSheets() {
     totalScore: Number(row[4]),
     maxScore:   Number(row[5]),
     impaired:   String(row[6]).includes('Impairment'),
-    datetime:   String(row[7] ?? ''),
+   datetime: (() => {
+      const raw = String(row[7] ?? '');
+      // Case 1: ISO string from Sheets — parse with Date to get local time
+      if (/\d{4}-\d{2}-\d{2}T/.test(raw)) {
+        const d = new Date(raw);
+        if (!isNaN(d)) {
+          const monthNames = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+          const day = d.getDate();
+          const month = monthNames[d.getMonth()];
+          const year = d.getFullYear() + 543;
+          const hh = String(d.getHours()).padStart(2, '0');
+          const mm = String(d.getMinutes()).padStart(2, '0');
+          return `${day} ${month} ${year} ${hh}:${mm}`;
+        }
+      }
+      // Case 2: Already Thai text — return as-is
+      return raw;
+    })(),
     duration:   Number(row[8]) || 0,
     breakdown: {
       clockDrawing:  row[9]  !== '' ? Number(row[9])  : undefined,
