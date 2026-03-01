@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import MiniCogQuiz from './MiniCogQuiz';
 import TMSEQuiz from './TMSEQuiz';
+import logoDementia from './assets/logo-dementia.svg';
 
 /* ── shared atoms ────────────────────────────────────────────────────────────*/
 const Cross = ({ s = 16, c = 'var(--mint-primary)' }) => (
@@ -237,7 +238,6 @@ const ResultSummaryModal = ({ result, patient, onClose, onViewAll }) => {
   const isMini     = result.type === 'Mini-Cog';
   const impaired   = result.impaired;
   const accent     = isMini ? 'var(--mint-primary)' : 'var(--mint-blue)';
-  const accentXl   = isMini ? 'var(--mint-primary-xl)' : 'var(--mint-blue-xl)';
   const grad       = isMini
     ? 'linear-gradient(135deg, var(--mint-primary), var(--mint-primary-l))'
     : 'linear-gradient(135deg, var(--mint-blue), #60a5fa)';
@@ -344,6 +344,16 @@ const ResultSummaryModal = ({ result, patient, onClose, onViewAll }) => {
               <p style={{ fontSize: 11, color: 'var(--mint-muted)', lineHeight: 1.5 }}>
                 * เป็นการคัดกรองเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์
               </p>
+              {result.duration != null && (
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: 'var(--mint-surface2)', border: '1px solid var(--mint-border2)', borderRadius: 8 }}>
+                  <span style={{ fontSize: 13 }}>⏱</span>
+                  <span style={{ fontSize: 11, color: 'var(--mint-text2)', fontWeight: 600 }}>เวลาที่ใช้</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: accent, fontVariantNumeric: 'tabular-nums' }}>
+                    {String(Math.floor(result.duration/60)).padStart(2,'0')}:{String(result.duration%60).padStart(2,'0')}
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--mint-muted)' }}>({result.duration} วินาที)</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -421,16 +431,19 @@ function exportCSV(results) {
   const headers = [
     'ลำดับ','ชื่อ-นามสกุล','อายุ','ประเภทแบบทดสอบ',
     'คะแนนรวม','คะแนนสูงสุด','การแปลผล','วันที่/เวลา',
+    'เวลาที่ใช้ (วินาที)','เวลาที่ใช้ (นาที:วินาที)',
     'Clock Drawing (Mini-Cog)','Word Recall (Mini-Cog)',
     'Orientation (TMSE)','Registration (TMSE)','Attention (TMSE)',
     'Calculation (TMSE)','Language (TMSE)','Recall (TMSE)',
   ];
   const rows = results.map((r, i) => {
-    const b = r.breakdown || {};
+    const b   = r.breakdown || {};
+    const sec = r.duration ?? 0;
+    const fmt = `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;
     return [
       i + 1, r.name, r.age, r.type, r.totalScore, r.maxScore,
       r.impaired ? 'มีภาวะ Cognitive Impairment' : 'อยู่ในเกณฑ์ปกติ',
-      r.datetime,
+      r.datetime, sec, fmt,
       b.clockDrawing ?? '', b.wordRecall ?? '',
       b.orientation ?? '', b.registration ?? '',
       b.attention ?? '', b.calculation ?? '',
@@ -495,7 +508,7 @@ const ResultsPage = ({ results, onExport, onClear }) => (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 520 }}>
             <thead>
               <tr style={{ background: 'var(--mint-surface2)', borderBottom: '2px solid var(--mint-border2)' }}>
-                {['#','ชื่อ-นามสกุล','อายุ','แบบทดสอบ','คะแนน','การแปลผล','วันที่/เวลา'].map(h => (
+                {['#','ชื่อ-นามสกุล','อายุ','แบบทดสอบ','คะแนน','การแปลผล','วันที่/เวลา','ระยะเวลา'].map(h => (
                   <th key={h} style={{
                     padding: '11px 14px', textAlign: 'left', fontWeight: 700,
                     color: 'var(--mint-text2)', fontSize: 11, letterSpacing: '0.05em', whiteSpace: 'nowrap',
@@ -538,6 +551,11 @@ const ResultsPage = ({ results, onExport, onClear }) => (
                     </span>
                   </td>
                   <td style={{ padding: '11px 14px', color: 'var(--mint-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{r.datetime}</td>
+                  <td style={{ padding: '11px 14px', color: 'var(--mint-text2)', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                    {r.duration != null && r.duration > 0
+                      ? `⏱ ${String(Math.floor(r.duration/60)).padStart(2,'0')}:${String(r.duration%60).padStart(2,'0')}`
+                      : '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -638,6 +656,7 @@ export default function App() {
       maxScore:   scoreData.maxScore,
       impaired:   scoreData.impaired,
       breakdown:  scoreData.breakdown,
+      duration:   scoreData.duration ?? 0,
       datetime,
     };
 
@@ -696,14 +715,11 @@ export default function App() {
         gap: 10,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 0 }} onClick={() => setTab('home')}>
-          <div style={{
-            width: 34, height: 34,
-            background: 'linear-gradient(135deg, var(--mint-primary), var(--mint-primary-l))',
-            borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(14,159,142,0.3)', flexShrink: 0,
-          }}>
-            <Cross s={16} c="white" />
-          </div>
+          <img
+            src={logoDementia}
+            alt="DementiaEval logo"
+            style={{ width: 34, height: 34, borderRadius: 10, boxShadow: '0 4px 12px rgba(14,159,142,0.3)', flexShrink: 0 }}
+          />
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--mint-text)', letterSpacing: '0.02em', lineHeight: 1.2 }}>
               Dementia<span style={{ color: 'var(--mint-primary)' }}>Eval</span>

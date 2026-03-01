@@ -1,5 +1,47 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 
+/* ── useTimer hook ── */
+function useTimer(autoStart = false) {
+  const [elapsed, setElapsed] = useState(0);
+  const elapsedRef  = useRef(0);
+  const intervalRef = useRef(null);
+  const startedAt   = useRef(null);
+  const stoppedRef  = useRef(false);
+
+  const start = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current); // clear any leftover (StrictMode)
+    stoppedRef.current = false;
+    startedAt.current = Date.now() - elapsedRef.current * 1000;
+    intervalRef.current = setInterval(() => {
+      if (stoppedRef.current) return;
+      const s = Math.floor((Date.now() - startedAt.current) / 1000);
+      elapsedRef.current = s;
+      setElapsed(s);
+    }, 500); // 500ms tick so display updates feel snappy
+  }, []);
+
+  const stop = useCallback(() => {
+    stoppedRef.current = true;
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  }, []);
+
+  const snapshot = useCallback(() => elapsedRef.current, []);
+
+  // autoStart support
+  useEffect(() => {
+    if (autoStart) start();
+    return () => {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    };
+  }, [autoStart, start]);
+
+  const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+
+  return { elapsed, fmt: fmt(elapsed), start, stop, snapshot };
+}
+
 /* ── Word sets (7 sets × 3 words each) ── */
 const WORD_SETS = [
   ['กล้วย', 'ผู้นำ', 'หมู่บ้าน'],
@@ -306,7 +348,9 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
   const [calcS, setCalcS] = useState(null);
   const [langS, setLangS] = useState({ naming1:null, naming2:null, repeat:null, commands:Array(3).fill(null), read:null, copy:null, similarity:null });
   const [recS,  setRecS]  = useState(Array(3).fill(null));
-  const [done,  setDone]  = useState(false);
+  const [done,        setDone]        = useState(false);
+  const [finalDuration, setFinalDuration] = useState(0);
+  const timer = useTimer(true); // autoStart on mount
 
   // Reset recall scores when word set changes
   const handleWordSetChange = (idx) => {
@@ -325,6 +369,9 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
   const setRec = (i, v) => { const a=[...recS]; a[i]=v; setRecS(a); };
 
   const handleFinish = () => {
+    const duration = timer.snapshot();  // read ref before stop
+    timer.stop();
+    setFinalDuration(duration);
     setDone(true);
     if (onComplete) {
       onComplete({
@@ -332,6 +379,7 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
         totalScore: total,
         maxScore: 30,
         impaired,
+        duration,
         breakdown: {
           orientation:  oriTotal,
           registration: regS ?? 0,
@@ -378,8 +426,8 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
             </div>
           )}
 
-          {/* Word set used */}
-          <div style={{ display:'flex',alignItems:'center',gap:8,padding:'8px 14px',background:'var(--mint-surface2)',border:'1px solid var(--mint-border2)',borderRadius:10,marginBottom:16 }}>
+          {/* Word set used + duration */}
+          <div style={{ display:'flex',alignItems:'center',gap:8,padding:'8px 14px',background:'var(--mint-surface2)',border:'1px solid var(--mint-border2)',borderRadius:10,marginBottom:16,flexWrap:'wrap' }}>
             <span style={{ fontSize:11,color:'var(--mint-muted)' }}>ชุดคำที่ใช้:</span>
             <span style={{ fontSize:11,fontWeight:700,color:'var(--mint-primary)' }}>{WORD_SET_LABELS[wordSetIdx]}</span>
             <div style={{ display:'flex',gap:4,marginLeft:4 }}>
@@ -387,6 +435,9 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
                 <span key={w} style={{ fontSize:10,background:'var(--mint-primary-xl)',color:'var(--mint-primary)',padding:'1px 6px',borderRadius:6,fontWeight:700 }}>{w}</span>
               ))}
             </div>
+            <span style={{ marginLeft:'auto',fontSize:11,fontWeight:700,color:'var(--mint-text2)',background:'white',border:'1px solid var(--mint-border)',borderRadius:8,padding:'2px 8px',flexShrink:0 }}>
+              ⏱ {String(Math.floor(finalDuration/60)).padStart(2,'0')}:{String(finalDuration%60).padStart(2,'0')}
+            </span>
           </div>
 
           <div style={{ textAlign:'center',marginBottom:28 }}>
@@ -449,8 +500,13 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
             </span>
           )}
         </div>
-        <div style={{ fontSize:12,fontWeight:700,color:'var(--mint-primary)',background:'var(--mint-primary-xl)',border:'1px solid var(--mint-border)',borderRadius:20,padding:'3px 10px' }}>
-          {total}/30
+        <div style={{ display:'flex',alignItems:'center',gap:8 }}>
+          <div style={{ fontSize:12,fontWeight:700,color:'var(--mint-primary)',background:'var(--mint-primary-xl)',border:'1px solid var(--mint-border)',borderRadius:20,padding:'3px 10px' }}>
+            {total}/30
+          </div>
+          <div style={{ fontSize:12,fontWeight:700,color:'var(--mint-text2)',background:'white',border:'1px solid var(--mint-border)',borderRadius:20,padding:'3px 10px',fontVariantNumeric:'tabular-nums',display:'flex',alignItems:'center',gap:4 }}>
+            <span>⏱</span><span>{timer.fmt}</span>
+          </div>
         </div>
       </div>
 

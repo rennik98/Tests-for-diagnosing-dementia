@@ -1,5 +1,43 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 
+/* ── useTimer hook ── */
+function useTimer(autoStart = false) {
+  const [elapsed, setElapsed] = useState(0);
+  const elapsedRef  = useRef(0);
+  const intervalRef = useRef(null);
+  const startedAt   = useRef(null);
+  const stoppedRef  = useRef(false);
+
+  const start = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    stoppedRef.current = false;
+    startedAt.current = Date.now() - elapsedRef.current * 1000;
+    intervalRef.current = setInterval(() => {
+      if (stoppedRef.current) return;
+      const s = Math.floor((Date.now() - startedAt.current) / 1000);
+      elapsedRef.current = s;
+      setElapsed(s);
+    }, 500);
+  }, []);
+
+  const stop = useCallback(() => {
+    stoppedRef.current = true;
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  }, []);
+
+  const snapshot = useCallback(() => elapsedRef.current, []);
+
+  useEffect(() => {
+    if (autoStart) start();
+    return () => { clearInterval(intervalRef.current); intervalRef.current = null; };
+  }, [autoStart, start]);
+
+  const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+
+  return { elapsed, fmt: fmt(elapsed), start, stop, snapshot };
+}
+
 /* ── Word sets (7 sets × 3 words each) ── */
 const WORD_SETS = [
   ['กล้วย', 'ผู้นำ', 'หมู่บ้าน'],
@@ -389,25 +427,30 @@ export default function MiniCogQuiz({ onBack, onComplete, patient }) {
   const [step,       setStep]       = useState(1);
   const [clockScore, setCS]         = useState(null);
   const [result,     setResult]     = useState(null);
+  const timer = useTimer();
 
   const currentWords = WORD_SETS[wordSetIdx];
 
+  // Start timer when moving from step 1 → 2 (test begins)
+  const handleStart = () => { timer.start(); setStep(2); };
+
   const handleWordSetChange = (idx) => {
     setWordSetIdx(idx);
-    // Reset to step 1 if we changed words after starting
-    if (step > 1) { setStep(1); setCS(null); }
+    if (step > 1) { setStep(1); setCS(null); timer.stop(); }
   };
 
   const handleClockScore = (sc) => { setCS(sc); setStep(3); };
 
   const handleRecallScore = (rc) => {
+    const duration = timer.snapshot();  // read ref before stop
+    timer.stop();
     const cs    = clockScore ?? 0;
     const total = cs + rc;
-    const r     = { clockScore: cs, recallScore: rc, total, impaired: total <= 3 };
+    const r     = { clockScore: cs, recallScore: rc, total, impaired: total <= 3, duration };
     setResult(r);
     setStep(4);
     if (onComplete) {
-      onComplete({ type: 'Mini-Cog', totalScore: total, maxScore: 5, impaired: total <= 3, breakdown: { clockDrawing: cs, wordRecall: rc } });
+      onComplete({ type: 'Mini-Cog', totalScore: total, maxScore: 5, impaired: total <= 3, duration, breakdown: { clockDrawing: cs, wordRecall: rc } });
     }
   };
 
@@ -436,6 +479,13 @@ export default function MiniCogQuiz({ onBack, onComplete, patient }) {
         </div>
         <div style={{ fontSize: 12, color: 'var(--mint-muted)', fontWeight: 600 }}>ขั้นตอน {Math.min(step, 3)}/3</div>
       </div>
+      {/* Timer bar — shows once test started */}
+      {step >= 2 && step <= 3 && (
+        <div style={{ background: 'var(--mint-primary-xl)', borderBottom: '1px solid var(--mint-border)', padding: '6px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--mint-text2)', fontWeight: 600 }}>⏱ เวลาที่ใช้</span>
+          <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--mint-primary)', fontVariantNumeric: 'tabular-nums', letterSpacing: '0.05em' }}>{timer.fmt}</span>
+        </div>
+      )}
 
       <div style={{ flex: 1, maxWidth: 520, margin: '0 auto', width: '100%', padding: '28px 14px' }}>
         <StepBar step={step} />
@@ -457,7 +507,7 @@ export default function MiniCogQuiz({ onBack, onComplete, patient }) {
                 ))}
               </div>
             </div>
-            <button onClick={() => setStep(2)} style={{ width: '100%', padding: 14, background: 'linear-gradient(135deg,var(--mint-primary),var(--mint-primary-l))', color: 'white', border: 'none', borderRadius: 13, fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: '0 6px 18px rgba(14,159,142,0.3)' }}>
+            <button onClick={handleStart} style={{ width: '100%', padding: 14, background: 'linear-gradient(135deg,var(--mint-primary),var(--mint-primary-l))', color: 'white', border: 'none', borderRadius: 13, fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: '0 6px 18px rgba(14,159,142,0.3)' }}>
               จำคำศัพท์ได้แล้ว →
             </button>
           </Card>
@@ -493,13 +543,16 @@ export default function MiniCogQuiz({ onBack, onComplete, patient }) {
               </div>
             )}
 
-            {/* Word set used */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: 'var(--mint-surface2)', border: '1px solid var(--mint-border2)', borderRadius: 10, marginBottom: 18 }}>
+            {/* Word set used + duration */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', background: 'var(--mint-surface2)', border: '1px solid var(--mint-border2)', borderRadius: 10, marginBottom: 18, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>ชุดคำที่ใช้:</span>
               <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--mint-primary)' }}>{WORD_SET_LABELS[wordSetIdx]}</span>
               {currentWords.map(w => (
                 <span key={w} style={{ fontSize: 10, background: 'var(--mint-primary-xl)', color: 'var(--mint-primary)', padding: '1px 6px', borderRadius: 6, fontWeight: 700 }}>{w}</span>
               ))}
+              <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: 'var(--mint-text2)', background: 'white', border: '1px solid var(--mint-border)', borderRadius: 8, padding: '2px 8px', flexShrink: 0 }}>
+                ⏱ {String(Math.floor((result.duration||0) / 60)).padStart(2,'0')}:{String((result.duration||0) % 60).padStart(2,'0')}
+              </span>
             </div>
 
             {/* Score ring */}
