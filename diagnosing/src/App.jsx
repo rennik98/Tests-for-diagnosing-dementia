@@ -24,12 +24,12 @@ const Tag = ({ children, color = 'var(--mint-primary)', bg = 'var(--mint-primary
 const Pill = ({ label, value, color = 'var(--mint-primary)' }) => (
   <div style={{
     display: 'flex', flexDirection: 'column', alignItems: 'center',
-    padding: '10px 18px', background: 'white',
+    padding: '10px 14px', background: 'white',
     border: '1px solid var(--mint-border2)',
     borderRadius: 14, boxShadow: 'var(--shadow-sm)',
   }}>
-    <span style={{ fontSize: 17, fontWeight: 800, color }}>{value}</span>
-    <span style={{ fontSize: 11, color: 'var(--mint-muted)', marginTop: 2 }}>{label}</span>
+    <span style={{ fontSize: 16, fontWeight: 800, color }}>{value}</span>
+    <span style={{ fontSize: 10, color: 'var(--mint-muted)', marginTop: 2, textAlign: 'center' }}>{label}</span>
   </div>
 );
 
@@ -38,10 +38,10 @@ const TestCard = ({ icon, title, sub, badge, bColor, bBg, onClick }) => (
     onClick={onClick}
     style={{
       background: 'white', border: '1.5px solid var(--mint-border)',
-      borderRadius: 22, padding: '28px 26px',
+      borderRadius: 22, padding: '22px 20px',
       cursor: 'pointer', transition: 'all 0.22s ease',
       boxShadow: 'var(--shadow-sm)',
-      display: 'flex', flexDirection: 'column', gap: 14,
+      display: 'flex', flexDirection: 'column', gap: 12,
       position: 'relative', overflow: 'hidden',
     }}
     onMouseOver={e => { e.currentTarget.style.boxShadow = 'var(--shadow-lg)'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.borderColor = bColor; }}
@@ -51,14 +51,14 @@ const TestCard = ({ icon, title, sub, badge, bColor, bBg, onClick }) => (
       <Cross s={80} c={bColor} />
     </div>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-      <div style={{ width: 48, height: 48, borderRadius: 14, background: bBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>
+      <div style={{ width: 44, height: 44, borderRadius: 13, background: bBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
         {icon}
       </div>
       <Tag color={bColor} bg={bBg}>{badge}</Tag>
     </div>
     <div>
-      <h3 style={{ fontSize: 18, fontWeight: 800, color: 'var(--mint-text)', marginBottom: 6 }}>{title}</h3>
-      <p style={{ fontSize: 13, color: 'var(--mint-muted)', lineHeight: 1.65 }}>{sub}</p>
+      <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--mint-text)', marginBottom: 5 }}>{title}</h3>
+      <p style={{ fontSize: 13, color: 'var(--mint-muted)', lineHeight: 1.6 }}>{sub}</p>
     </div>
     <div style={{ fontSize: 13, fontWeight: 700, color: bColor, display: 'flex', alignItems: 'center', gap: 5 }}>
       เริ่มทดสอบ <span>→</span>
@@ -69,15 +69,15 @@ const TestCard = ({ icon, title, sub, badge, bColor, bBg, onClick }) => (
 const InfoCard = ({ icon, title, desc }) => (
   <div style={{
     background: 'white', border: '1px solid var(--mint-border2)',
-    borderRadius: 18, padding: '22px 20px',
-    display: 'flex', gap: 14, boxShadow: 'var(--shadow-sm)',
+    borderRadius: 16, padding: '18px 16px',
+    display: 'flex', gap: 12, boxShadow: 'var(--shadow-sm)',
   }}>
-    <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--mint-primary-xl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
+    <div style={{ width: 38, height: 38, borderRadius: 11, background: 'var(--mint-primary-xl)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, flexShrink: 0 }}>
       {icon}
     </div>
     <div>
-      <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--mint-text)', marginBottom: 5 }}>{title}</p>
-      <p style={{ fontSize: 13, color: 'var(--mint-muted)', lineHeight: 1.65 }}>{desc}</p>
+      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--mint-text)', marginBottom: 4 }}>{title}</p>
+      <p style={{ fontSize: 12, color: 'var(--mint-muted)', lineHeight: 1.6 }}>{desc}</p>
     </div>
   </div>
 );
@@ -85,11 +85,11 @@ const InfoCard = ({ icon, title, desc }) => (
 const CriteriaBlock = ({ title, color, children }) => (
   <div style={{
     background: 'white', border: `1.5px solid ${color}33`,
-    borderRadius: 22, padding: '32px', boxShadow: 'var(--shadow-sm)',
+    borderRadius: 22, padding: '24px 20px', boxShadow: 'var(--shadow-sm)',
   }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
-      <div style={{ width: 5, height: 26, borderRadius: 3, background: color }} />
-      <h3 style={{ fontSize: 18, fontWeight: 800, color }}>{title}</h3>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+      <div style={{ width: 5, height: 26, borderRadius: 3, background: color, flexShrink: 0 }} />
+      <h3 style={{ fontSize: 17, fontWeight: 800, color }}>{title}</h3>
     </div>
     {children}
   </div>
@@ -141,10 +141,10 @@ const PatientForm = ({ quizType, onConfirm, onCancel }) => {
     <div style={{
       position: 'fixed', inset: 0, zIndex: 200,
       background: 'rgba(15,43,40,0.55)', backdropFilter: 'blur(6px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
     }}>
       <div style={{
-        background: 'white', borderRadius: 24, padding: '36px 32px',
+        background: 'white', borderRadius: 22, padding: '28px 22px',
         width: '100%', maxWidth: 420,
         boxShadow: '0 20px 60px rgba(14,159,142,0.2)',
         border: '1.5px solid var(--mint-border)',
@@ -154,19 +154,19 @@ const PatientForm = ({ quizType, onConfirm, onCancel }) => {
           <div style={{
             width: 42, height: 42, borderRadius: 12,
             background: quizType === 'minicog' ? 'var(--mint-primary-xl)' : 'var(--mint-blue-xl)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0,
           }}>
             {quizType === 'minicog' ? '⚡' : '🧠'}
           </div>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--mint-text)' }}>ข้อมูลผู้เข้ารับการทดสอบ</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--mint-text)' }}>ข้อมูลผู้เข้ารับการทดสอบ</div>
             <div style={{ fontSize: 11, color: typeColor, fontWeight: 600 }}>{typeLabel}</div>
           </div>
         </div>
-        <p style={{ fontSize: 13, color: 'var(--mint-muted)', marginBottom: 24, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 13, color: 'var(--mint-muted)', marginBottom: 20, lineHeight: 1.6 }}>
           กรอกข้อมูลเพื่อบันทึกผลการทดสอบเข้าระบบ
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 18 }}>
           <div>
             <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--mint-text2)', display: 'block', marginBottom: 6 }}>
               ชื่อ-นามสกุล <span style={{ color: '#ef4444' }}>*</span>
@@ -205,7 +205,7 @@ const PatientForm = ({ quizType, onConfirm, onCancel }) => {
           </div>
         </div>
         {err && (
-          <div style={{ padding: '9px 14px', borderRadius: 10, marginBottom: 16, background: '#fff1f1', border: '1px solid #fca5a5', fontSize: 13, color: '#dc2626', fontWeight: 600 }}>
+          <div style={{ padding: '9px 14px', borderRadius: 10, marginBottom: 14, background: '#fff1f1', border: '1px solid #fca5a5', fontSize: 13, color: '#dc2626', fontWeight: 600 }}>
             ⚠️ {err}
           </div>
         )}
@@ -265,29 +265,29 @@ function exportCSV(results) {
 /* ── Results Page ────────────────────────────────────────────────────────────*/
 const ResultsPage = ({ results, onExport, onClear }) => (
   <div className="fade-up">
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28 }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 24, gap: 12 }}>
       <div>
-        <h2 style={{ fontSize: 28, fontWeight: 800, color: 'var(--mint-text)' }}>ผลการทดสอบทั้งหมด</h2>
+        <h2 style={{ fontSize: 24, fontWeight: 800, color: 'var(--mint-text)' }}>ผลการทดสอบทั้งหมด</h2>
         <p style={{ fontSize: 14, color: 'var(--mint-muted)', marginTop: 4 }}>
           บันทึกไว้แล้ว <strong style={{ color: 'var(--mint-primary)' }}>{results.length}</strong> รายการ
         </p>
       </div>
-      <div style={{ display: 'flex', gap: 10 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {results.length > 0 && (
           <>
             <button onClick={onClear} style={{
-              padding: '10px 16px', borderRadius: 11, fontSize: 13, fontWeight: 700,
+              padding: '9px 14px', borderRadius: 11, fontSize: 13, fontWeight: 700,
               background: '#fff1f1', border: '1px solid #fca5a5', color: '#dc2626', cursor: 'pointer',
             }}>
-              🗑️ ล้างข้อมูลทั้งหมด
+              🗑️ ล้างข้อมูล
             </button>
             <button onClick={onExport} style={{
-              padding: '10px 20px', borderRadius: 11, fontSize: 13, fontWeight: 700,
+              padding: '9px 16px', borderRadius: 11, fontSize: 13, fontWeight: 700,
               background: 'linear-gradient(135deg, var(--mint-primary), var(--mint-primary-l))',
               color: 'white', border: 'none', cursor: 'pointer',
               boxShadow: '0 4px 14px rgba(14,159,142,0.28)',
             }}>
-              📥 ดาวน์โหลดรายงาน CSV
+              📥 ดาวน์โหลด CSV
             </button>
           </>
         )}
@@ -296,7 +296,7 @@ const ResultsPage = ({ results, onExport, onClear }) => (
 
     {results.length === 0 ? (
       <div style={{
-        textAlign: 'center', padding: '80px 20px',
+        textAlign: 'center', padding: '60px 20px',
         background: 'white', border: '1.5px dashed var(--mint-border)',
         borderRadius: 22, color: 'var(--mint-muted)',
       }}>
@@ -306,13 +306,13 @@ const ResultsPage = ({ results, onExport, onClear }) => (
       </div>
     ) : (
       <div style={{ background: 'white', border: '1.5px solid var(--mint-border)', borderRadius: 22, overflow: 'hidden', boxShadow: 'var(--shadow-md)' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 520 }}>
             <thead>
               <tr style={{ background: 'var(--mint-surface2)', borderBottom: '2px solid var(--mint-border2)' }}>
                 {['#','ชื่อ-นามสกุล','อายุ','แบบทดสอบ','คะแนน','การแปลผล','วันที่/เวลา'].map(h => (
                   <th key={h} style={{
-                    padding: '12px 16px', textAlign: 'left', fontWeight: 700,
+                    padding: '11px 14px', textAlign: 'left', fontWeight: 700,
                     color: 'var(--mint-text2)', fontSize: 11, letterSpacing: '0.05em', whiteSpace: 'nowrap',
                   }}>
                     {h}
@@ -326,10 +326,10 @@ const ResultsPage = ({ results, onExport, onClear }) => (
                   onMouseOver={e => e.currentTarget.style.background = 'var(--mint-surface2)'}
                   onMouseOut={e  => e.currentTarget.style.background = 'transparent'}
                 >
-                  <td style={{ padding: '12px 16px', color: 'var(--mint-muted)', fontWeight: 600 }}>{i + 1}</td>
-                  <td style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--mint-text)' }}>{r.name}</td>
-                  <td style={{ padding: '12px 16px', color: 'var(--mint-text2)' }}>{r.age} ปี</td>
-                  <td style={{ padding: '12px 16px' }}>
+                  <td style={{ padding: '11px 14px', color: 'var(--mint-muted)', fontWeight: 600 }}>{i + 1}</td>
+                  <td style={{ padding: '11px 14px', fontWeight: 700, color: 'var(--mint-text)' }}>{r.name}</td>
+                  <td style={{ padding: '11px 14px', color: 'var(--mint-text2)' }}>{r.age} ปี</td>
+                  <td style={{ padding: '11px 14px' }}>
                     <span style={{
                       padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
                       background: r.type === 'Mini-Cog' ? 'var(--mint-primary-xl)' : 'var(--mint-blue-xl)',
@@ -338,20 +338,21 @@ const ResultsPage = ({ results, onExport, onClear }) => (
                       {r.type}
                     </span>
                   </td>
-                  <td style={{ padding: '12px 16px', fontWeight: 800, fontSize: 15, color: r.impaired ? 'var(--mint-warn)' : 'var(--mint-primary)' }}>
+                  <td style={{ padding: '11px 14px', fontWeight: 800, fontSize: 15, color: r.impaired ? 'var(--mint-warn)' : 'var(--mint-primary)' }}>
                     {r.totalScore}<span style={{ fontSize: 11, fontWeight: 400, color: 'var(--mint-muted)' }}>/{r.maxScore}</span>
                   </td>
-                  <td style={{ padding: '12px 16px' }}>
+                  <td style={{ padding: '11px 14px' }}>
                     <span style={{
-                      padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 700,
+                      padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
                       background: r.impaired ? '#fff7ed' : '#f0fdf9',
                       color: r.impaired ? '#92400e' : '#065f46',
                       border: '1px solid ' + (r.impaired ? '#fcd34d88' : '#6ee7d588'),
+                      whiteSpace: 'nowrap',
                     }}>
                       {r.impaired ? '⚠️ บกพร่อง' : '✅ ปกติ'}
                     </span>
                   </td>
-                  <td style={{ padding: '12px 16px', color: 'var(--mint-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{r.datetime}</td>
+                  <td style={{ padding: '11px 14px', color: 'var(--mint-muted)', fontSize: 12, whiteSpace: 'nowrap' }}>{r.datetime}</td>
                 </tr>
               ))}
             </tbody>
@@ -359,7 +360,7 @@ const ResultsPage = ({ results, onExport, onClear }) => (
         </div>
 
         {/* breakdown cards */}
-        <div style={{ padding: '20px 16px', borderTop: '1px solid var(--mint-border2)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+        <div style={{ padding: '16px', borderTop: '1px solid var(--mint-border2)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
           {results.map((r, i) => {
             const b = r.breakdown || {};
             const isMini = r.type === 'Mini-Cog';
@@ -368,14 +369,14 @@ const ResultsPage = ({ results, onExport, onClear }) => (
               <div key={i} style={{
                 background: 'var(--mint-surface2)',
                 border: '1px solid ' + (isMini ? 'var(--mint-border)' : '#bfdbfe'),
-                borderRadius: 14, padding: '14px 16px',
+                borderRadius: 14, padding: '14px 14px',
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--mint-text)' }}>{r.name}</p>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--mint-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</p>
                     <p style={{ fontSize: 11, color: 'var(--mint-muted)' }}>{r.type} · {r.datetime}</p>
                   </div>
-                  <span style={{ fontSize: 18, fontWeight: 800, color }}>{r.totalScore}/{r.maxScore}</span>
+                  <span style={{ fontSize: 17, fontWeight: 800, color, flexShrink: 0, marginLeft: 8 }}>{r.totalScore}/{r.maxScore}</span>
                 </div>
                 {isMini ? (
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -407,10 +408,10 @@ const ResultsPage = ({ results, onExport, onClear }) => (
 
 /* ── App ─────────────────────────────────────────────────────────────────────*/
 export default function App() {
-  const [tab,        setTab]      = useState('home');   // 'home' | 'results' | 'about'
-  const [quiz,       setQuiz]     = useState(null);     // 'minicog' | 'tmse'
-  const [showForm,   setShowForm] = useState(null);     // 'minicog' | 'tmse'
-  const [patient,    setPatient]  = useState(null);     // { name, age }
+  const [tab,        setTab]      = useState('home');
+  const [quiz,       setQuiz]     = useState(null);
+  const [showForm,   setShowForm] = useState(null);
+  const [patient,    setPatient]  = useState(null);
 
   const STORAGE_KEY = 'dementia_eval_results';
   const [allResults, setAllResults] = useState(() => {
@@ -422,24 +423,21 @@ export default function App() {
     }
   });
 
-  // Sync to localStorage whenever allResults changes
   const saveResults = (updater) => {
     setAllResults(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch (_e) { /* storage unavailable */ }
       return next;
     });
   };
 
-  /* Step 2 → 3: patient form confirmed, launch quiz */
   const handleFormConfirm = (info) => {
-    const quizType = showForm;   // capture BEFORE clearing state
+    const quizType = showForm;
     setPatient(info);
     setShowForm(null);
-    setQuiz(quizType);           // ← THE FIX: use local var, not info._quizType
+    setQuiz(quizType);
   };
 
-  /* Step 4: quiz finished, save result, return home */
   const handleComplete = (scoreData) => {
     const now = new Date();
     const datetime =
@@ -463,15 +461,12 @@ export default function App() {
 
   const handleBack = () => { setQuiz(null); setPatient(null); setTab('home'); };
 
-  /* Render active quiz screens */
   if (quiz === 'minicog') return <MiniCogQuiz patient={patient} onBack={handleBack} onComplete={handleComplete} />;
   if (quiz === 'tmse')    return <TMSEQuiz    patient={patient} onBack={handleBack} onComplete={handleComplete} />;
 
-  /* ── Landing ── */
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Patient Form Modal */}
       {showForm && (
         <PatientForm
           quizType={showForm}
@@ -483,47 +478,48 @@ export default function App() {
       {/* Nav */}
       <nav style={{
         position: 'sticky', top: 0, zIndex: 50,
-        background: 'rgba(240,250,248,0.88)', backdropFilter: 'blur(18px)',
+        background: 'rgba(240,250,248,0.92)', backdropFilter: 'blur(18px)',
         borderBottom: '1px solid var(--mint-border)',
-        padding: '0 40px', height: 64,
+        padding: '0 16px', height: 58,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 10,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setTab('home')}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flexShrink: 0 }} onClick={() => setTab('home')}>
           <div style={{
-            width: 38, height: 38,
+            width: 34, height: 34,
             background: 'linear-gradient(135deg, var(--mint-primary), var(--mint-primary-l))',
-            borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(14,159,142,0.3)',
+            borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(14,159,142,0.3)', flexShrink: 0,
           }}>
-            <Cross s={18} c="white" />
+            <Cross s={16} c="white" />
           </div>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--mint-text)', letterSpacing: '0.03em' }}>
-              Dementia<span style={{ color: 'var(--mint-primary)' }}>Evaluation</span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--mint-text)', letterSpacing: '0.02em', lineHeight: 1.2 }}>
+              Dementia<span style={{ color: 'var(--mint-primary)' }}>Eval</span>
             </div>
-            <div style={{ fontSize: 9, color: 'var(--mint-muted)', letterSpacing: '0.1em', fontWeight: 600 }}>COGNITIVE SCREENING</div>
+            <div style={{ fontSize: 8, color: 'var(--mint-muted)', letterSpacing: '0.08em', fontWeight: 600 }}>COGNITIVE SCREENING</div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 4, background: 'white', borderRadius: 12, padding: 4, border: '1px solid var(--mint-border)' }}>
+        <div style={{ display: 'flex', gap: 3, background: 'white', borderRadius: 11, padding: 3, border: '1px solid var(--mint-border)', flexShrink: 0 }}>
           {[
             ['home',    'หน้าหลัก'],
-            ['results', 'ผลทั้งหมด' + (allResults.length > 0 ? ' (' + allResults.length + ')' : '')],
-            ['about',   'เกณฑ์คะแนน'],
+            ['results', 'ผล' + (allResults.length > 0 ? ` (${allResults.length})` : '')],
+            ['about',   'เกณฑ์'],
           ].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)} style={{
-              padding: '7px 18px', borderRadius: 9, fontSize: 13, fontWeight: 600,
+              padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
               border: 'none', cursor: 'pointer', transition: 'all 0.18s',
               background: tab === key ? 'var(--mint-primary)' : 'transparent',
               color: tab === key ? 'white' : 'var(--mint-muted)',
               boxShadow: tab === key ? '0 2px 8px rgba(14,159,142,0.3)' : 'none',
-              position: 'relative',
+              position: 'relative', whiteSpace: 'nowrap',
             }}>
               {label}
               {key === 'results' && allResults.length > 0 && tab !== 'results' && (
                 <span style={{
                   position: 'absolute', top: -3, right: -3,
-                  width: 8, height: 8, borderRadius: '50%',
+                  width: 7, height: 7, borderRadius: '50%',
                   background: 'var(--mint-warn)', border: '2px solid white',
                 }} />
               )}
@@ -533,31 +529,36 @@ export default function App() {
       </nav>
 
       {/* Main */}
-      <main style={{ flex: 1, maxWidth: 1160, margin: '0 auto', width: '100%', padding: '64px 40px' }}>
+      <main style={{ flex: 1, maxWidth: 1160, margin: '0 auto', width: '100%', padding: '32px 16px' }}>
 
         {/* HOME */}
         {tab === 'home' && (
           <div className="fade-up">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 72, alignItems: 'center', marginBottom: 72 }}>
+            {/* Hero — responsive: 2 cols on wide, 1 col on mobile */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
+              gap: 36, alignItems: 'center', marginBottom: 48,
+            }}>
               <div>
-                <div style={{ marginBottom: 22 }}>
+                <div style={{ marginBottom: 18 }}>
                   <Tag>
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--mint-primary)', display: 'inline-block', animation: 'breathe 2.2s ease infinite' }} />
                     VALIDATED CLINICAL TOOLS
                   </Tag>
                 </div>
-                <h1 style={{ fontFamily: "'Lora', 'Sarabun', serif", fontSize: 52, fontWeight: 600, lineHeight: 1.15, color: 'var(--mint-text)', marginBottom: 20 }}>
+                <h1 style={{ fontFamily: "'Lora', 'Sarabun', serif", fontSize: 'clamp(32px, 6vw, 52px)', fontWeight: 600, lineHeight: 1.15, color: 'var(--mint-text)', marginBottom: 16 }}>
                   ประเมินสุขภาพ<br />
                   <span style={{ color: 'var(--mint-primary)', fontStyle: 'italic' }}>สมอง </span>
                   <span style={{ color: 'var(--mint-text)' }}>ด้วย</span><br />
                   มาตรฐานสากล
                 </h1>
-                <p style={{ fontSize: 15, color: 'var(--mint-text2)', lineHeight: 1.8, marginBottom: 32, maxWidth: 420 }}>
+                <p style={{ fontSize: 14, color: 'var(--mint-text2)', lineHeight: 1.8, marginBottom: 28, maxWidth: 420 }}>
                   คัดกรองภาวะสมองเสื่อมเบื้องต้นด้วยแบบทดสอบ Mini-Cog และ TMSE ที่ผ่านการรับรองทางการแพทย์
                 </p>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 36 }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 28 }}>
                   <button onClick={() => setShowForm('minicog')} style={{
-                    padding: '13px 26px',
+                    padding: '12px 22px',
                     background: 'linear-gradient(135deg, var(--mint-primary), var(--mint-primary-l))',
                     color: 'white', border: 'none', borderRadius: 13,
                     fontSize: 14, fontWeight: 700, cursor: 'pointer',
@@ -569,7 +570,7 @@ export default function App() {
                     เริ่ม Mini-Cog →
                   </button>
                   <button onClick={() => setShowForm('tmse')} style={{
-                    padding: '13px 26px', background: 'var(--mint-blue-xl)',
+                    padding: '12px 22px', background: 'var(--mint-blue-xl)',
                     color: 'var(--mint-blue)', border: '1.5px solid var(--mint-blue-l)',
                     borderRadius: 13, fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
                   }}
@@ -580,7 +581,7 @@ export default function App() {
                   </button>
                   {allResults.length > 0 && (
                     <button onClick={() => setTab('results')} style={{
-                      padding: '13px 22px', background: 'white',
+                      padding: '12px 18px', background: 'white',
                       color: 'var(--mint-text)', border: '1.5px solid var(--mint-border)',
                       borderRadius: 13, fontSize: 14, fontWeight: 700, cursor: 'pointer',
                       boxShadow: 'var(--shadow-sm)', transition: 'all 0.2s',
@@ -588,18 +589,18 @@ export default function App() {
                       onMouseOver={e => { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
                       onMouseOut={e  => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.transform = 'translateY(0)'; }}
                     >
-                      📋 ดูผลทั้งหมด ({allResults.length} รายการ)
+                      📋 ดูผล ({allResults.length})
                     </button>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <Pill label="ความแม่นยำ" value="76–99%" color="var(--mint-primary)" />
-                  <Pill label="คะแนนสูงสุด TMSE" value="30 pts" color="var(--mint-blue)" />
+                  <Pill label="TMSE สูงสุด" value="30 pts" color="var(--mint-blue)" />
                   <Pill label="ระยะเวลา" value="3–15 min" color="var(--mint-warn)" />
                   {allResults.length > 0 && <Pill label="บันทึกแล้ว" value={allResults.length + ' ราย'} color="var(--mint-primary)" />}
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <TestCard
                   icon="⚡" title="Mini-Cog™"
                   sub="การทดสอบความจำ 3 คำ + การวาดรูปนาฬิกา เหมาะสำหรับการคัดกรองเบื้องต้นอย่างรวดเร็ว"
@@ -614,7 +615,9 @@ export default function App() {
                 />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+
+            {/* Info cards — responsive grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 14 }}>
               <InfoCard icon="🔬" title="Evidence-Based" desc="ทั้ง Mini-Cog และ TMSE ผ่านการรับรองและตีพิมพ์ในวารสารการแพทย์ระดับสากล" />
               <InfoCard icon="🛡️" title="ความเป็นส่วนตัว" desc="ไม่มีการบันทึกหรือส่งข้อมูลใดๆ ออกจากอุปกรณ์ของคุณ ปลอดภัย 100%" />
               <InfoCard icon="📊" title="Export CSV" desc="ดาวน์โหลดผลการทดสอบทุกรายการเป็นไฟล์ CSV รองรับภาษาไทย พร้อมรายละเอียดคะแนน" />
@@ -633,26 +636,26 @@ export default function App() {
 
         {/* ABOUT */}
         {tab === 'about' && (
-          <div style={{ maxWidth: 700, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }} className="fade-up">
+          <div style={{ maxWidth: 700, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }} className="fade-up">
             <div style={{ marginBottom: 4 }}>
-              <h2 style={{ fontSize: 28, fontWeight: 800, color: 'var(--mint-text)' }}>เกณฑ์การประเมิน</h2>
+              <h2 style={{ fontSize: 24, fontWeight: 800, color: 'var(--mint-text)' }}>เกณฑ์การประเมิน</h2>
               <p style={{ fontSize: 14, color: 'var(--mint-muted)', marginTop: 5 }}>มาตรฐานการตีความผลการทดสอบสมรรถภาพสมอง</p>
             </div>
             <CriteriaBlock title="Mini-Cog™" color="var(--mint-primary)">
-              <p style={{ fontSize: 14, color: 'var(--mint-text2)', lineHeight: 1.75, marginBottom: 16 }}>
+              <p style={{ fontSize: 14, color: 'var(--mint-text2)', lineHeight: 1.75, marginBottom: 14 }}>
                 คะแนนเต็ม <strong style={{ color: 'var(--mint-text)' }}>5 คะแนน</strong> — คะแนน ≤ 3 ถือว่ามีภาวะ Cognitive Impairment
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 4 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 4 }}>
                 <ScoreRow label="Word Recall" val="3 คะแนน" color="var(--mint-primary)" />
                 <ScoreRow label="Clock Drawing" val="2 คะแนน" color="var(--mint-primary)" />
               </div>
               <WarnBadge>คะแนน ≤ 3 → มีแนวโน้มภาวะ Cognitive Impairment</WarnBadge>
             </CriteriaBlock>
             <CriteriaBlock title="TMSE — Thai Mental State Examination" color="var(--mint-blue)">
-              <p style={{ fontSize: 14, color: 'var(--mint-text2)', lineHeight: 1.75, marginBottom: 16 }}>
+              <p style={{ fontSize: 14, color: 'var(--mint-text2)', lineHeight: 1.75, marginBottom: 14 }}>
                 คะแนนเต็ม <strong style={{ color: 'var(--mint-text)' }}>30 คะแนน</strong> — คะแนน &lt; 24 ถือว่ามีภาวะ Cognitive Impairment
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 4 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, marginBottom: 4 }}>
                 {[['Orientation','6 คะแนน'],['Registration','3 คะแนน'],['Attention','5 คะแนน'],['Calculation','3 คะแนน'],['Language','10 คะแนน'],['Recall','3 คะแนน']].map(([n,v]) => (
                   <ScoreRow key={n} label={n} val={v} color="var(--mint-blue)" />
                 ))}
@@ -668,12 +671,12 @@ export default function App() {
 
       {/* Footer */}
       <footer style={{
-        borderTop: '1px solid var(--mint-border)', padding: '18px 40px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white',
+        borderTop: '1px solid var(--mint-border)', padding: '14px 16px',
+        display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', background: 'white', gap: 8,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Cross s={12} />
-          <span style={{ fontSize: 12, color: 'var(--mint-muted)' }}>BrainCheck — เครื่องมือคัดกรองเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์</span>
+          <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>BrainCheck — เครื่องมือคัดกรองเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์</span>
         </div>
         <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>Mini-Cog™ © S. Borson</span>
       </footer>

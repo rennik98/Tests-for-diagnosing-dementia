@@ -1,13 +1,6 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 const CORRECT_WORDS = ['หลานสาว', 'สวรรค์', 'ภูเขา'];
-const TARGET_HOUR   = 330;
-const TARGET_MIN    = 60;
-const TOLERANCE     = 25;
-const CLOCK_NUMS    = [12,1,2,3,4,5,6,7,8,9,10,11];
-
-const norm  = a => ((a % 360) + 360) % 360;
-const close = (a, b) => { const d = Math.abs(norm(a) - norm(b)); return d <= TOLERANCE || d >= 360 - TOLERANCE; };
 
 /* ── shared ui ── */
 const Cross = ({ s = 14, c = 'var(--mint-primary)' }) => (
@@ -19,25 +12,21 @@ const Cross = ({ s = 14, c = 'var(--mint-primary)' }) => (
 
 const Card = ({ children, style = {} }) => (
   <div style={{
-    background: 'white',
-    border: '1.5px solid var(--mint-border)',
-    borderRadius: 22,
-    padding: '30px 28px',
-    boxShadow: 'var(--shadow-md)',
-    ...style,
+    background: 'white', border: '1.5px solid var(--mint-border)',
+    borderRadius: 22, padding: '24px 20px', boxShadow: 'var(--shadow-md)', ...style,
   }}>
     {children}
   </div>
 );
 
 const StepBar = ({ step }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 36 }}>
-    {[1,2,3].map((n, i) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 28 }}>
+    {[1, 2, 3].map((n, i) => (
       <React.Fragment key={n}>
         <div style={{
-          width: 34, height: 34, borderRadius: '50%',
+          width: 32, height: 32, borderRadius: '50%',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13, fontWeight: 700, flexShrink: 0,
+          fontSize: 12, fontWeight: 700, flexShrink: 0,
           background:   step > n ? 'var(--mint-primary)' : step === n ? 'var(--mint-primary-xl)' : 'var(--mint-border2)',
           border:       `2px solid ${step >= n ? 'var(--mint-primary)' : 'var(--mint-border)'}`,
           color:        step > n ? 'white' : step === n ? 'var(--mint-primary)' : 'var(--mint-muted)',
@@ -57,93 +46,373 @@ const StepBar = ({ step }) => (
   </div>
 );
 
-const YN = ({ val, onChange, yL = 'ถูก', nL = 'ผิด' }) => (
-  <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-    {[[1, yL, 'var(--mint-primary)', 'var(--mint-primary-xl)', 'var(--mint-primary)'],
-      [0, nL, '#ef4444', '#fff1f1', '#fca5a5']].map(([v, label, col, bg, border]) => (
-      <button key={v} onClick={() => onChange(v)} style={{
-        flex: 1, padding: '9px', borderRadius: 10, fontSize: 13, fontWeight: 700,
-        border: `1.5px solid ${val === v ? border : 'var(--mint-border)'}`,
-        background: val === v ? bg : 'var(--mint-surface2)',
-        color: val === v ? col : 'var(--mint-muted)',
-        cursor: 'pointer', transition: 'all 0.18s',
-      }}>
-        {val === v ? (v===1?'✓ ':'✗ ') : ''}{label}
-      </button>
-    ))}
-  </div>
-);
-
 const SectionHead = ({ n, title, color = 'var(--mint-primary)' }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
     <div style={{
       width: 30, height: 30, borderRadius: 9,
       background: color === 'var(--mint-primary)' ? 'var(--mint-primary-xl)' : 'var(--mint-blue-xl)',
       border: `1.5px solid ${color}44`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 13, fontWeight: 800, color,
+      fontSize: 13, fontWeight: 800, color, flexShrink: 0,
     }}>
       {n}
     </div>
-    <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--mint-text)' }}>{title}</h2>
+    <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--mint-text)' }}>{title}</h2>
   </div>
 );
 
-/* ── main ── */
-export default function MiniCogQuiz({ onBack, onComplete, patient }) {
-  const [step, setStep]           = useState(1);
-  const [clockScore, setCS]       = useState(null);
-  const [words, setWords]         = useState(['','','']);
-  const [result, setResult]       = useState(null);
-  const [hourA, setHourA]         = useState(0);
-  const [minA,  setMinA]          = useState(0);
-  const [drag,  setDrag]          = useState(null);
-  const clockRef = useRef(null);
+/* ── Freehand Clock Canvas ── */
+function ClockCanvas({ onConfirm }) {
+  const canvasRef = useRef(null);
+  const drawing   = useRef(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [isEmpty,   setIsEmpty]   = useState(true);
 
-  const getAngle = useCallback(e => {
-    if (!clockRef.current) return 0;
-    const r = clockRef.current.getBoundingClientRect();
-    const cx = r.left + r.width/2, cy = r.top + r.height/2;
-    const x = e.touches ? e.touches[0].clientX : e.clientX;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    return norm(Math.atan2(y-cy, x-cx)*(180/Math.PI)+90);
-  }, []);
+  const SIZE = Math.min(280, (typeof window !== 'undefined' ? window.innerWidth : 400) - 60);
+  const CX   = SIZE / 2;
 
-  const onMove = useCallback(e => {
-    if (!drag) return;
-    const a = getAngle(e);
-    drag === 'hour' ? setHourA(a) : setMinA(a);
-  }, [drag, getAngle]);
+  const drawBase = useCallback((ctx) => {
+    ctx.save();
+    // Outer circle only — no numbers, no tick marks
+    ctx.beginPath();
+    ctx.arc(CX, CX, CX - 6, 0, Math.PI * 2);
+    ctx.strokeStyle = '#0e9f8e';
+    ctx.lineWidth   = 3;
+    ctx.stroke();
+    ctx.restore();
+  }, [CX]);
 
-  const evalClock = () => {
-    const sc = (close(hourA, TARGET_HOUR) && close(minA, TARGET_MIN)) ? 2 : 0;
-    setCS(sc); setStep(3);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, SIZE, SIZE);
+    drawBase(ctx);
+  }, [SIZE, drawBase]);
+
+  const getPos = (e, canvas) => {
+    const rect   = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const src    = e.touches ? e.touches[0] : e;
+    return {
+      x: (src.clientX - rect.left) * scaleX,
+      y: (src.clientY - rect.top)  * scaleY,
+    };
   };
 
-  const evalRecall = () => {
-    const rc = words.filter(w => CORRECT_WORDS.includes(w.trim())).length;
-    const cs = clockScore ?? 0;
+  const startDraw = (e) => {
+    if (confirmed) return;
+    e.preventDefault();
+    drawing.current = true;
+    const canvas = canvasRef.current;
+    const ctx    = canvas.getContext('2d');
+    const pos    = getPos(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    ctx.strokeStyle = '#0f2b28';
+    ctx.lineWidth   = 2.5;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+  };
+
+  const draw = (e) => {
+    if (!drawing.current || confirmed) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    const ctx    = canvas.getContext('2d');
+    const pos    = getPos(e, canvas);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    setIsEmpty(false);
+  };
+
+  const stopDraw = () => { drawing.current = false; };
+
+  const handleClear = () => {
+    const canvas = canvasRef.current;
+    const ctx    = canvas.getContext('2d');
+    ctx.clearRect(0, 0, SIZE, SIZE);
+    drawBase(ctx);
+    setIsEmpty(true);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+      {!confirmed ? (
+        <>
+          <p style={{ fontSize: 13, color: 'var(--mint-text2)', textAlign: 'center', lineHeight: 1.7 }}>
+            วาด <strong>ตัวเลข 1–12</strong> และ <strong>เข็มนาฬิกา</strong> ให้แสดงเวลา{' '}
+            <strong style={{ color: 'var(--mint-blue)' }}>11:10 น.</strong>
+          </p>
+
+          <canvas
+            ref={canvasRef}
+            width={SIZE}
+            height={SIZE}
+            style={{
+              borderRadius: '50%', cursor: 'crosshair', display: 'block',
+              boxShadow: '0 4px 20px rgba(14,159,142,0.15)', touchAction: 'none',
+              border: '2px solid var(--mint-border2)',
+            }}
+            onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+            onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+          />
+
+          <div style={{ display: 'flex', gap: 10, width: '100%' }}>
+            <button onClick={handleClear} style={{
+              flex: 1, padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+              background: 'var(--mint-surface2)', border: '1.5px solid var(--mint-border)',
+              color: 'var(--mint-muted)', cursor: 'pointer',
+            }}>
+              🗑️ ล้างใหม่
+            </button>
+            <button
+              onClick={() => setConfirmed(true)}
+              disabled={isEmpty}
+              style={{
+                flex: 2, padding: '11px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+                background: isEmpty
+                  ? 'var(--mint-border2)'
+                  : 'linear-gradient(135deg,var(--mint-blue),#60a5fa)',
+                color: isEmpty ? 'var(--mint-muted)' : 'white',
+                border: 'none', cursor: isEmpty ? 'not-allowed' : 'pointer',
+                boxShadow: isEmpty ? 'none' : '0 4px 14px rgba(59,130,246,0.3)',
+                transition: 'all 0.2s',
+              }}
+            >
+              ยืนยันการวาด ✓
+            </button>
+          </div>
+        </>
+      ) : (
+        /* ── Score selection ── */
+        <div style={{ width: '100%' }}>
+          {/* Show completed drawing (read-only) */}
+          <canvas
+            ref={canvasRef}
+            width={SIZE}
+            height={SIZE}
+            style={{
+              borderRadius: '50%', display: 'block', margin: '0 auto 20px',
+              boxShadow: '0 4px 20px rgba(14,159,142,0.15)', opacity: 0.88,
+              border: '2px solid var(--mint-border2)',
+            }}
+          />
+
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--mint-text)', marginBottom: 8, textAlign: 'center' }}>
+            ให้คะแนนการวาดนาฬิกา
+          </p>
+          <div style={{ padding: '10px 14px', background: 'var(--mint-blue-xl)', border: '1px solid var(--mint-blue-l)', borderRadius: 10, marginBottom: 18 }}>
+            <p style={{ fontSize: 12, color: 'var(--mint-blue)', textAlign: 'center', lineHeight: 1.7 }}>
+              ✓ ถูกต้อง = มีตัวเลข 1–12 ครบ, เข็มชั่วโมงชี้ที่ <strong>11</strong> และเข็มนาทีชี้ที่ <strong>2</strong>
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+            <button onClick={() => onConfirm(0)} style={{
+              flex: 1, padding: '18px 10px', borderRadius: 14, fontSize: 15, fontWeight: 800,
+              background: '#fff1f1', border: '1.5px solid #fca5a5',
+              color: '#dc2626', cursor: 'pointer', transition: 'all 0.18s',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            }}
+              onMouseOver={e => e.currentTarget.style.background = '#fee2e2'}
+              onMouseOut={e  => e.currentTarget.style.background = '#fff1f1'}
+            >
+              <span style={{ fontSize: 26 }}>✗</span>
+              <span>0 คะแนน</span>
+              <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.7 }}>ไม่ถูกต้อง</span>
+            </button>
+            <button onClick={() => onConfirm(2)} style={{
+              flex: 1, padding: '18px 10px', borderRadius: 14, fontSize: 15, fontWeight: 800,
+              background: 'var(--mint-primary-xl)', border: '1.5px solid var(--mint-primary)',
+              color: 'var(--mint-primary)', cursor: 'pointer', transition: 'all 0.18s',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+            }}
+              onMouseOver={e => e.currentTarget.style.background = '#c8f0eb'}
+              onMouseOut={e  => e.currentTarget.style.background = 'var(--mint-primary-xl)'}
+            >
+              <span style={{ fontSize: 26 }}>✓</span>
+              <span>2 คะแนน</span>
+              <span style={{ fontSize: 11, fontWeight: 500, opacity: 0.7 }}>ถูกต้อง</span>
+            </button>
+          </div>
+
+          <button onClick={() => { setConfirmed(false); setIsEmpty(false); }} style={{
+            width: '100%', padding: '9px', borderRadius: 10,
+            background: 'none', border: 'none', color: 'var(--mint-muted)',
+            fontSize: 12, cursor: 'pointer',
+          }}>
+            ← วาดใหม่
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Word Recall with Answer Key ── */
+function WordRecall({ onConfirm }) {
+  const [checked, setChecked] = useState([null, null, null]);
+
+  const toggle = (i, val) => {
+    setChecked(prev => {
+      const a = [...prev];
+      a[i] = a[i] === val ? null : val;
+      return a;
+    });
+  };
+
+  const allAnswered = checked.every(v => v !== null);
+  const score       = checked.filter(v => v === true).length;
+
+  return (
+    <div>
+      <p style={{ fontSize: 13, color: 'var(--mint-text2)', marginBottom: 6, lineHeight: 1.6 }}>
+        ตรวจสอบว่าผู้รับการทดสอบจำคำแต่ละคำได้หรือไม่
+      </p>
+      <p style={{ fontSize: 11, color: 'var(--mint-muted)', marginBottom: 18 }}>
+        กดติ๊กถูก/ผิดสำหรับแต่ละคำ (คำเฉลยแสดงด้านล่าง)
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+        {CORRECT_WORDS.map((word, i) => (
+          <div key={word} style={{
+            background: checked[i] === true
+              ? 'var(--mint-primary-xl)'
+              : checked[i] === false
+              ? '#fff1f1'
+              : 'var(--mint-surface2)',
+            border: `1.5px solid ${
+              checked[i] === true
+                ? 'var(--mint-primary)'
+                : checked[i] === false
+                ? '#fca5a5'
+                : 'var(--mint-border2)'
+            }`,
+            borderRadius: 14, padding: '14px 16px', transition: 'all 0.2s',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+              {/* Word badge + label */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                  background: checked[i] === true
+                    ? 'var(--mint-primary)'
+                    : checked[i] === false
+                    ? '#ef4444'
+                    : 'var(--mint-border2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 18, fontWeight: 800, transition: 'background 0.2s',
+                }}>
+                  {checked[i] === true
+                    ? <span style={{ color: 'white' }}>✓</span>
+                    : checked[i] === false
+                    ? <span style={{ color: 'white' }}>✗</span>
+                    : <span style={{ fontSize: 13, color: 'var(--mint-muted)' }}>{i + 1}</span>
+                  }
+                </div>
+                <div>
+                  <div style={{
+                    fontSize: 17, fontWeight: 800,
+                    color: checked[i] === true
+                      ? 'var(--mint-primary)'
+                      : checked[i] === false
+                      ? '#dc2626'
+                      : 'var(--mint-text)',
+                    transition: 'color 0.2s',
+                  }}>
+                    {word}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--mint-muted)', marginTop: 1 }}>คำเฉลยคำที่ {i + 1}</div>
+                </div>
+              </div>
+
+              {/* จำได้ / ลืม buttons */}
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button onClick={() => toggle(i, true)} style={{
+                  padding: '8px 14px', borderRadius: 9, fontSize: 12, fontWeight: 700,
+                  border: `1.5px solid ${checked[i] === true ? 'var(--mint-primary)' : 'var(--mint-border)'}`,
+                  background: checked[i] === true ? 'var(--mint-primary)' : 'white',
+                  color: checked[i] === true ? 'white' : 'var(--mint-muted)',
+                  cursor: 'pointer', transition: 'all 0.18s', minWidth: 60,
+                }}>จำได้</button>
+                <button onClick={() => toggle(i, false)} style={{
+                  padding: '8px 14px', borderRadius: 9, fontSize: 12, fontWeight: 700,
+                  border: `1.5px solid ${checked[i] === false ? '#fca5a5' : 'var(--mint-border)'}`,
+                  background: checked[i] === false ? '#ef4444' : 'white',
+                  color: checked[i] === false ? 'white' : 'var(--mint-muted)',
+                  cursor: 'pointer', transition: 'all 0.18s', minWidth: 60,
+                }}>ลืม</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Score preview */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '12px 16px', background: 'var(--mint-surface2)',
+        border: '1px solid var(--mint-border2)', borderRadius: 12, marginBottom: 16,
+      }}>
+        <span style={{ fontSize: 13, color: 'var(--mint-text2)' }}>คะแนนความจำ</span>
+        <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--mint-primary)' }}>
+          {checked.filter(v => v === true).length}
+          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--mint-muted)' }}>/3</span>
+        </span>
+      </div>
+
+      <button
+        onClick={() => onConfirm(score)}
+        disabled={!allAnswered}
+        style={{
+          width: '100%', padding: 14, borderRadius: 13, fontSize: 15, fontWeight: 700,
+          background: allAnswered
+            ? 'linear-gradient(135deg,var(--mint-primary),var(--mint-primary-l))'
+            : 'var(--mint-border2)',
+          color: allAnswered ? 'white' : 'var(--mint-muted)',
+          border: 'none', cursor: allAnswered ? 'pointer' : 'not-allowed',
+          boxShadow: allAnswered ? '0 6px 18px rgba(14,159,142,0.3)' : 'none',
+          transition: 'all 0.2s',
+        }}
+      >
+        ยืนยันคะแนนและดูผล →
+      </button>
+    </div>
+  );
+}
+
+/* ── main ── */
+export default function MiniCogQuiz({ onBack, onComplete, patient }) {
+  const [step,       setStep]   = useState(1);
+  const [clockScore, setCS]     = useState(null);
+  const [result,     setResult] = useState(null);
+
+  const handleClockScore = (sc) => {
+    setCS(sc);
+    setStep(3);
+  };
+
+  const handleRecallScore = (rc) => {
+    const cs    = clockScore ?? 0;
     const total = cs + rc;
-    const r = { clockScore: cs, recallScore: rc, total, impaired: total <= 3 };
+    const r     = { clockScore: cs, recallScore: rc, total, impaired: total <= 3 };
     setResult(r);
     setStep(4);
 
-    // Notify parent
     if (onComplete) {
       onComplete({
         type: 'Mini-Cog',
         totalScore: total,
         maxScore: 5,
         impaired: total <= 3,
-        breakdown: {
-          clockDrawing: cs,
-          wordRecall: rc,
-        },
+        breakdown: { clockDrawing: cs, wordRecall: rc },
       });
     }
   };
 
-  const reset = () => { setStep(1); setWords(['','','']); setCS(null); setResult(null); setHourA(0); setMinA(0); };
+  const reset = () => { setStep(1); setCS(null); setResult(null); };
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -153,38 +422,38 @@ export default function MiniCogQuiz({ onBack, onComplete, patient }) {
         position: 'sticky', top: 0, zIndex: 50,
         background: 'rgba(240,250,248,0.9)', backdropFilter: 'blur(18px)',
         borderBottom: '1px solid var(--mint-border)',
-        padding: '0 32px', height: 60,
+        padding: '0 16px', height: 56,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--mint-muted)', cursor: 'pointer', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+        <button onClick={onBack} style={{ background: 'none', border: 'none', color: 'var(--mint-muted)', cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: '8px 0' }}>
           ← กลับ
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Cross s={14} />
           <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--mint-text)' }}>Mini-Cog™</span>
           {patient && (
-            <span style={{ fontSize: 12, color: 'var(--mint-primary)', fontWeight: 600, background: 'var(--mint-primary-xl)', padding: '2px 10px', borderRadius: 20, border: '1px solid var(--mint-border)' }}>
-              {patient.name} · {patient.age} ปี
+            <span style={{ fontSize: 11, color: 'var(--mint-primary)', fontWeight: 600, background: 'var(--mint-primary-xl)', padding: '2px 8px', borderRadius: 20, border: '1px solid var(--mint-border)', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {patient.name}
             </span>
           )}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--mint-muted)', fontWeight: 600 }}>ขั้นตอน {Math.min(step,3)}/3</div>
+        <div style={{ fontSize: 12, color: 'var(--mint-muted)', fontWeight: 600 }}>ขั้นตอน {Math.min(step, 3)}/3</div>
       </div>
 
-      <div style={{ flex: 1, maxWidth: 540, margin: '0 auto', width: '100%', padding: '40px 20px' }}>
+      <div style={{ flex: 1, maxWidth: 520, margin: '0 auto', width: '100%', padding: '28px 14px' }}>
         <StepBar step={step} />
 
-        {/* ── Step 1 ── */}
+        {/* ── Step 1: Word Registration ── */}
         {step === 1 && (
-          <Card className="scale-in">
+          <Card>
             <SectionHead n="1" title="การลงทะเบียนคำศัพท์" />
-            <div style={{ background: 'var(--mint-primary-xl)', border: '1px solid var(--mint-border)', borderRadius: 16, padding: 20, marginBottom: 24 }}>
-              <p style={{ fontSize: 13, color: 'var(--mint-text2)', fontStyle: 'italic', textAlign: 'center', lineHeight: 1.75, marginBottom: 16 }}>
+            <div style={{ background: 'var(--mint-primary-xl)', border: '1px solid var(--mint-border)', borderRadius: 16, padding: 18, marginBottom: 22 }}>
+              <p style={{ fontSize: 13, color: 'var(--mint-text2)', fontStyle: 'italic', textAlign: 'center', lineHeight: 1.75, marginBottom: 14 }}>
                 "ให้ตั้งใจฟังดีๆ เดี๋ยวจะบอกคำ 3 คำ เมื่อพูดจบแล้วให้พูดตามและจำไว้ เดี๋ยวจะกลับมาถามซ้ำ"
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
                 {CORRECT_WORDS.map(w => (
-                  <div key={w} style={{ background: 'white', border: '1.5px solid var(--mint-border)', borderRadius: 12, padding: '14px 8px', textAlign: 'center', fontWeight: 800, fontSize: 15, color: 'var(--mint-primary)', boxShadow: 'var(--shadow-sm)' }}>
+                  <div key={w} style={{ background: 'white', border: '1.5px solid var(--mint-border)', borderRadius: 12, padding: '12px 6px', textAlign: 'center', fontWeight: 800, fontSize: 14, color: 'var(--mint-primary)', boxShadow: 'var(--shadow-sm)' }}>
                     {w}
                   </div>
                 ))}
@@ -196,166 +465,83 @@ export default function MiniCogQuiz({ onBack, onComplete, patient }) {
           </Card>
         )}
 
-        {/* ── Step 2 ── */}
+        {/* ── Step 2: Clock Drawing ── */}
         {step === 2 && (
-          <Card className="scale-in">
+          <Card>
             <SectionHead n="2" title="การวาดรูปนาฬิกา" color="var(--mint-blue)" />
-            <p style={{ fontSize: 13, color: 'var(--mint-text2)', marginBottom: 24, paddingLeft: 40 }}>
-              ลากเข็มไปที่เวลา <strong style={{ color: 'var(--mint-blue)' }}>11:10 น.</strong>
-              <br /><span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>🔵 น้ำเงิน = ชั่วโมง &nbsp;|&nbsp; 🟣 ม่วง = นาที</span>
-            </p>
-
-            {/* clock */}
-            <div
-              ref={clockRef}
-              onMouseMove={onMove} onMouseUp={() => setDrag(null)} onMouseLeave={() => setDrag(null)}
-              onTouchMove={onMove} onTouchEnd={() => setDrag(null)}
-              style={{ position: 'relative', width: 260, height: 260, margin: '0 auto 24px', userSelect: 'none', touchAction: 'none' }}
-            >
-              <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'linear-gradient(145deg,#f8fffe,white)', border: '3px solid var(--mint-border)', boxShadow: '0 4px 24px rgba(14,159,142,0.12), inset 0 1px 4px rgba(255,255,255,0.8)' }} />
-
-              {[...Array(60)].map((_,i) => {
-                const ang = (i*6-90)*(Math.PI/180), maj = i%5===0;
-                const r1 = maj?91:96, r2=103;
-                return (
-                  <svg key={i} style={{ position:'absolute',inset:0,pointerEvents:'none' }} width="260" height="260">
-                    <line x1={130+r1*Math.cos(ang)} y1={130+r1*Math.sin(ang)} x2={130+r2*Math.cos(ang)} y2={130+r2*Math.sin(ang)}
-                      stroke={maj?'var(--mint-text2)':'var(--mint-border)'} strokeWidth={maj?2:1} />
-                  </svg>
-                );
-              })}
-
-              {CLOCK_NUMS.map((num,i) => {
-                const ang = (i*30-90)*(Math.PI/180), r=108;
-                return (
-                  <span key={num} style={{ position:'absolute', left:130+r*Math.cos(ang), top:130+r*Math.sin(ang), transform:'translate(-50%,-50%)', fontSize:11, fontWeight:700, color:'var(--mint-text2)', pointerEvents:'none' }}>
-                    {num}
-                  </span>
-                );
-              })}
-
-              {/* hour hand */}
-              <div onMouseDown={() => setDrag('hour')} onTouchStart={() => setDrag('hour')}
-                style={{ position:'absolute', left:130, top:130, width:6, height:72, marginLeft:-3, marginTop:-72, transformOrigin:'bottom center', transform:`rotate(${hourA}deg)`, cursor:'grab' }}>
-                <div style={{ width:'100%', height:'100%', background:'linear-gradient(to top,#0e9f8e,#34d9c5)', borderRadius:4, boxShadow:'0 2px 6px rgba(14,159,142,0.35)' }} />
-                <div style={{ position:'absolute', top:-11, left:'50%', transform:'translateX(-50%)', width:22, height:22, background:'var(--mint-primary)', borderRadius:'50%', border:'3px solid white', boxShadow:'0 2px 8px rgba(14,159,142,0.4)' }} />
-              </div>
-
-              {/* minute hand */}
-              <div onMouseDown={() => setDrag('min')} onTouchStart={() => setDrag('min')}
-                style={{ position:'absolute', left:130, top:130, width:4, height:90, marginLeft:-2, marginTop:-90, transformOrigin:'bottom center', transform:`rotate(${minA}deg)`, cursor:'grab' }}>
-                <div style={{ width:'100%', height:'100%', background:'linear-gradient(to top,#3b82f6,#93c5fd)', borderRadius:4, boxShadow:'0 2px 6px rgba(59,130,246,0.35)' }} />
-                <div style={{ position:'absolute', top:-11, left:'50%', transform:'translateX(-50%)', width:22, height:22, background:'var(--mint-blue)', borderRadius:'50%', border:'3px solid white', boxShadow:'0 2px 8px rgba(59,130,246,0.4)' }} />
-              </div>
-
-              <div style={{ position:'absolute', left:130, top:130, width:12, height:12, background:'var(--mint-text)', borderRadius:'50%', transform:'translate(-50%,-50%)', zIndex:10 }} />
-            </div>
-
-            <div style={{ display:'flex', justifyContent:'center', gap:20, marginBottom:20 }}>
-              {[['🔵','ชั่วโมง',hourA,'var(--mint-primary)'],['🟣','นาที',minA,'var(--mint-blue)']].map(([em,lb,a,c]) => (
-                <span key={lb} style={{ fontSize:12, color:'var(--mint-muted)', display:'flex', alignItems:'center', gap:4 }}>
-                  {em} {lb}: <strong style={{ color:c }}>{Math.round(norm(a))}°</strong>
-                </span>
-              ))}
-            </div>
-
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:8 }}>
-              <button onClick={evalClock} style={{ padding:13, background:'var(--mint-text)', color:'white', border:'none', borderRadius:12, fontSize:13, fontWeight:700, cursor:'pointer' }}>
-                ตรวจอัตโนมัติ
-              </button>
-              <button onClick={() => { setCS(2); setStep(3); }} style={{ padding:13, background:'#f0fdf4', color:'#16a34a', border:'1px solid #bbf7d0', borderRadius:12, fontSize:13, fontWeight:700, cursor:'pointer' }}>
-                ✓ ถูกต้อง (2 คะแนน)
-              </button>
-            </div>
-            <button onClick={() => { setCS(0); setStep(3); }} style={{ width:'100%', padding:10, background:'none', border:'none', color:'var(--mint-muted)', fontSize:12, cursor:'pointer' }}>
-              ไม่ถูกต้อง (0 คะแนน) →
-            </button>
+            <ClockCanvas onConfirm={handleClockScore} />
           </Card>
         )}
 
-        {/* ── Step 3 ── */}
+        {/* ── Step 3: Word Recall ── */}
         {step === 3 && (
-          <Card className="scale-in">
+          <Card>
             <SectionHead n="3" title="การทดสอบความจำ" />
-            <p style={{ fontSize:13, color:'var(--mint-text2)', marginBottom:24, paddingLeft:40 }}>พิมพ์คำศัพท์ 3 คำที่จำได้จากตอนแรก</p>
-            <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:24 }}>
-              {words.map((w,i) => (
-                <input key={i} type="text" placeholder={`คำที่ ${i+1}`} value={w}
-                  onChange={e => { const a=[...words]; a[i]=e.target.value; setWords(a); }}
-                  style={{ width:'100%', padding:'13px 16px', background:'var(--mint-surface2)', border:'1.5px solid var(--mint-border)', borderRadius:12, fontSize:15, fontWeight:700, color:'var(--mint-text)', outline:'none', textAlign:'center', boxSizing:'border-box', transition:'border-color 0.18s' }}
-                  onFocus={e => e.target.style.borderColor='var(--mint-primary)'}
-                  onBlur={e  => e.target.style.borderColor='var(--mint-border)'}
-                />
-              ))}
-            </div>
-            <button onClick={evalRecall} style={{ width:'100%', padding:14, background:'linear-gradient(135deg,var(--mint-primary),var(--mint-primary-l))', color:'white', border:'none', borderRadius:13, fontSize:15, fontWeight:700, cursor:'pointer', boxShadow:'0 6px 18px rgba(14,159,142,0.3)' }}>
-              ส่งคำตอบและดูผล →
-            </button>
+            <WordRecall onConfirm={handleRecallScore} />
           </Card>
         )}
 
-        {/* ── Step 4 Result ── */}
+        {/* ── Step 4: Result ── */}
         {step === 4 && result && (
-          <Card className="scale-in">
-            {/* patient info banner */}
+          <Card>
             {patient && (
-              <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', background:'var(--mint-primary-xl)', border:'1px solid var(--mint-border)', borderRadius:12, marginBottom:20 }}>
-                <span style={{ fontSize:16 }}>👤</span>
-                <div>
-                  <p style={{ fontSize:13, fontWeight:700, color:'var(--mint-text)' }}>{patient.name}</p>
-                  <p style={{ fontSize:11, color:'var(--mint-muted)' }}>อายุ {patient.age} ปี</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--mint-primary-xl)', border: '1px solid var(--mint-border)', borderRadius: 12, marginBottom: 20 }}>
+                <span style={{ fontSize: 16 }}>👤</span>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--mint-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{patient.name}</p>
+                  <p style={{ fontSize: 11, color: 'var(--mint-muted)' }}>อายุ {patient.age} ปี</p>
                 </div>
-                <div style={{ marginLeft:'auto', fontSize:11, color:'var(--mint-primary)', fontWeight:700 }}>✅ บันทึกแล้ว</div>
+                <div style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--mint-primary)', fontWeight: 700, flexShrink: 0 }}>✅ บันทึกแล้ว</div>
               </div>
             )}
 
-            {/* circle */}
-            <div style={{ textAlign:'center', marginBottom:24 }}>
-              <div style={{ position:'relative', width:110, height:110, margin:'0 auto 10px' }}>
-                <svg width="110" height="110" style={{ position:'absolute',inset:0 }}>
+            {/* Score ring */}
+            <div style={{ textAlign: 'center', marginBottom: 22 }}>
+              <div style={{ position: 'relative', width: 110, height: 110, margin: '0 auto 10px' }}>
+                <svg width="110" height="110" style={{ position: 'absolute', inset: 0 }}>
                   <circle cx="55" cy="55" r="48" fill="none" stroke="var(--mint-border2)" strokeWidth="7"/>
                   <circle cx="55" cy="55" r="48" fill="none"
                     stroke={result.impaired ? 'var(--mint-warn)' : 'var(--mint-primary)'} strokeWidth="7"
-                    strokeDasharray={`${(result.total/5)*301.6} 301.6`}
+                    strokeDasharray={`${(result.total / 5) * 301.6} 301.6`}
                     strokeLinecap="round" transform="rotate(-90 55 55)"
-                    style={{ transition:'stroke-dasharray 0.9s ease' }}
+                    style={{ transition: 'stroke-dasharray 0.9s ease' }}
                   />
                 </svg>
-                <div style={{ position:'absolute',inset:0,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center' }}>
-                  <span style={{ fontSize:30, fontWeight:800, color: result.impaired?'var(--mint-warn)':'var(--mint-primary)' }}>{result.total}</span>
-                  <span style={{ fontSize:11, color:'var(--mint-muted)' }}>/ 5</span>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 30, fontWeight: 800, color: result.impaired ? 'var(--mint-warn)' : 'var(--mint-primary)' }}>{result.total}</span>
+                  <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>/ 5</span>
                 </div>
               </div>
-              <p style={{ fontSize:11, color:'var(--mint-muted)', letterSpacing:'0.08em', textTransform:'uppercase' }}>คะแนนรวม</p>
+              <p style={{ fontSize: 11, color: 'var(--mint-muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>คะแนนรวม</p>
             </div>
 
-            <div style={{ borderRadius:14, padding:'14px 18px', marginBottom:20, background: result.impaired?'#fff7ed':'#f0fdf9', border:`1.5px solid ${result.impaired?'#fcd34d':'#6ee7d5'}` }}>
-              <p style={{ fontWeight:700, textAlign:'center', fontSize:14, color: result.impaired?'#92400e':'#065f46' }}>
+            <div style={{ borderRadius: 14, padding: '14px 18px', marginBottom: 18, background: result.impaired ? '#fff7ed' : '#f0fdf9', border: `1.5px solid ${result.impaired ? '#fcd34d' : '#6ee7d5'}` }}>
+              <p style={{ fontWeight: 700, textAlign: 'center', fontSize: 13, color: result.impaired ? '#92400e' : '#065f46' }}>
                 {result.impaired ? '⚠️ มีภาวะการรู้คิดบกพร่อง (Cognitive Impairment)' : '✅ ผลการประเมินเบื้องต้นอยู่ในเกณฑ์ปกติ'}
               </p>
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:20 }}>
-              {[['Clock Drawing',result.clockScore,2,'var(--mint-primary)'],['Word Recall',result.recallScore,3,'var(--mint-blue)']].map(([lb,sc,mx,c]) => (
-                <div key={lb} style={{ background:'var(--mint-surface2)', border:'1px solid var(--mint-border2)', borderRadius:12, padding:'14px', textAlign:'center' }}>
-                  <p style={{ fontSize:24, fontWeight:800, color:c }}>{sc}<span style={{ fontSize:13, fontWeight:400, color:'var(--mint-muted)' }}>/{mx}</span></p>
-                  <p style={{ fontSize:11, color:'var(--mint-muted)', marginTop:3 }}>{lb}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
+              {[['Clock Drawing', result.clockScore, 2, 'var(--mint-primary)'], ['Word Recall', result.recallScore, 3, 'var(--mint-blue)']].map(([lb, sc, mx, c]) => (
+                <div key={lb} style={{ background: 'var(--mint-surface2)', border: '1px solid var(--mint-border2)', borderRadius: 12, padding: '14px', textAlign: 'center' }}>
+                  <p style={{ fontSize: 24, fontWeight: 800, color: c }}>{sc}<span style={{ fontSize: 13, fontWeight: 400, color: 'var(--mint-muted)' }}>/{mx}</span></p>
+                  <p style={{ fontSize: 11, color: 'var(--mint-muted)', marginTop: 3 }}>{lb}</p>
                 </div>
               ))}
             </div>
 
-            <p style={{ fontSize:11, color:'var(--mint-muted)', textAlign:'center', marginBottom:18 }}>* ผลนี้เป็นการประเมินเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์</p>
+            <p style={{ fontSize: 11, color: 'var(--mint-muted)', textAlign: 'center', marginBottom: 16 }}>* ผลนี้เป็นการประเมินเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์</p>
 
-            <button onClick={reset} style={{ width:'100%', padding:13, background:'var(--mint-surface2)', border:'1.5px solid var(--mint-border)', color:'var(--mint-text)', borderRadius:12, fontSize:14, fontWeight:700, cursor:'pointer', marginBottom:8 }}>
+            <button onClick={reset} style={{ width: '100%', padding: 13, background: 'var(--mint-surface2)', border: '1.5px solid var(--mint-border)', color: 'var(--mint-text)', borderRadius: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 8 }}>
               ทำแบบทดสอบใหม่
             </button>
-            <button onClick={onBack} style={{ width:'100%', padding:9, background:'none', border:'none', color:'var(--mint-muted)', fontSize:12, cursor:'pointer' }}>
+            <button onClick={onBack} style={{ width: '100%', padding: 9, background: 'none', border: 'none', color: 'var(--mint-muted)', fontSize: 12, cursor: 'pointer' }}>
               ← กลับหน้าหลัก
             </button>
           </Card>
         )}
       </div>
-      <p style={{ textAlign:'center', fontSize:11, color:'var(--mint-muted)', padding:'14px', background:'white', borderTop:'1px solid var(--mint-border2)' }}>Mini-Cog™ © S. Borson</p>
+      <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--mint-muted)', padding: '14px', background: 'white', borderTop: '1px solid var(--mint-border2)' }}>Mini-Cog™ © S. Borson</p>
     </div>
   );
 }

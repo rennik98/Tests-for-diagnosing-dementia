@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 
 const REG_WORDS  = ['ต้นไม้', 'รถยนต์', 'มือ'];
 const DAYS_ORDER = ['อาทิตย์','เสาร์','ศุกร์','พฤหัสบดี','พุธ','อังคาร','จันทร์'];
@@ -25,11 +25,12 @@ const YN = ({ val, onChange, yL='ถูก', nL='ผิด' }) => (
     {[[1,yL,'var(--mint-primary)','var(--mint-primary-xl)','var(--mint-primary)'],
       [0,nL,'#ef4444','#fff1f1','#fca5a5']].map(([v,label,col,bg,border]) => (
       <button key={v} onClick={() => onChange(v)} style={{
-        flex:1, padding:'9px', borderRadius:10, fontSize:13, fontWeight:700,
+        flex:1, padding:'10px 8px', borderRadius:10, fontSize:13, fontWeight:700,
         border:`1.5px solid ${val===v ? border : 'var(--mint-border)'}`,
         background: val===v ? bg : 'var(--mint-surface2)',
         color: val===v ? col : 'var(--mint-muted)',
         cursor:'pointer', transition:'all 0.18s',
+        minHeight: 42,
       }}>
         {val===v ? (v===1?'✓ ':'✗ ') : ''}{label}
       </button>
@@ -38,14 +39,14 @@ const YN = ({ val, onChange, yL='ถูก', nL='ผิด' }) => (
 );
 
 const Section = ({ num, title, max, score, color='var(--mint-primary)', children }) => (
-  <div style={{ background:'white', border:`1.5px solid ${color}33`, borderRadius:20, padding:'26px 24px', boxShadow:'var(--shadow-sm)', position:'relative', overflow:'hidden' }}>
+  <div style={{ background:'white', border:`1.5px solid ${color}33`, borderRadius:20, padding:'22px 18px', boxShadow:'var(--shadow-sm)', position:'relative', overflow:'hidden' }}>
     <div style={{ position:'absolute', left:0, top:14, bottom:14, width:4, borderRadius:'0 3px 3px 0', background:color }} />
     <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:18 }}>
-      <div style={{ width:30, height:30, borderRadius:9, background:`${color}18`, border:`1.5px solid ${color}44`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color }}>
+      <div style={{ width:30, height:30, borderRadius:9, background:`${color}18`, border:`1.5px solid ${color}44`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:800, color, flexShrink:0 }}>
         {num}
       </div>
-      <h2 style={{ flex:1, fontSize:15, fontWeight:700, color:'var(--mint-text)' }}>{title}</h2>
-      <span style={{ fontSize:12, fontWeight:700, color, background:`${color}15`, border:`1px solid ${color}30`, borderRadius:20, padding:'2px 10px' }}>
+      <h2 style={{ flex:1, fontSize:14, fontWeight:700, color:'var(--mint-text)', lineHeight:1.3 }}>{title}</h2>
+      <span style={{ fontSize:12, fontWeight:700, color, background:`${color}15`, border:`1px solid ${color}30`, borderRadius:20, padding:'2px 10px', flexShrink:0 }}>
         {score}/{max}
       </span>
     </div>
@@ -60,9 +61,9 @@ const SubQ = ({ label, val, onChange }) => (
   </div>
 );
 
-const FocusInput = ({ value, onChange, placeholder, ...rest }) => (
+const FocusInput = ({ value, onChange, placeholder, style: extraStyle, ...rest }) => (
   <input value={value} onChange={onChange} placeholder={placeholder}
-    style={{ width:'100%', padding:'12px 14px', background:'var(--mint-surface2)', border:'1.5px solid var(--mint-border)', borderRadius:11, fontSize:14, fontWeight:700, color:'var(--mint-text)', outline:'none', boxSizing:'border-box', transition:'border-color 0.18s' }}
+    style={{ width:'100%', padding:'12px 14px', background:'var(--mint-surface2)', border:'1.5px solid var(--mint-border)', borderRadius:11, fontSize:14, fontWeight:700, color:'var(--mint-text)', outline:'none', boxSizing:'border-box', transition:'border-color 0.18s', ...extraStyle }}
     onFocus={e => e.target.style.borderColor='var(--mint-primary)'}
     onBlur={e  => e.target.style.borderColor='var(--mint-border)'}
     {...rest}
@@ -85,33 +86,119 @@ const ActionBtn = ({ children, onClick, variant='primary' }) => {
   );
 };
 
+
+/* ── Freehand Drawing Canvas (reusable) ── */
+function DrawingCanvas({ width=260, height=200, onScoreSelect }) {
+  const canvasRef  = useRef(null);
+  const drawing    = useRef(false);
+  const [confirmed, setConfirmed] = React.useState(false);
+  const [isEmpty,   setIsEmpty]   = React.useState(true);
+
+  const getPos = (e, canvas) => {
+    const rect   = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const src    = e.touches ? e.touches[0] : e;
+    return { x:(src.clientX-rect.left)*scaleX, y:(src.clientY-rect.top)*scaleY };
+  };
+
+  const startDraw = (e) => {
+    if (confirmed) return; e.preventDefault();
+    drawing.current = true;
+    const canvas = canvasRef.current; const ctx = canvas.getContext('2d');
+    const pos = getPos(e, canvas);
+    ctx.beginPath(); ctx.moveTo(pos.x, pos.y);
+    ctx.strokeStyle = '#0f2b28'; ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  };
+  const draw = (e) => {
+    if (!drawing.current || confirmed) return; e.preventDefault();
+    const canvas = canvasRef.current; const ctx = canvas.getContext('2d');
+    const pos = getPos(e, canvas);
+    ctx.lineTo(pos.x, pos.y); ctx.stroke(); setIsEmpty(false);
+  };
+  const stopDraw = () => { drawing.current = false; };
+
+  const handleClear = () => {
+    const canvas = canvasRef.current; const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, width, height); setIsEmpty(true);
+  };
+
+  if (confirmed) {
+    return (
+      <div>
+        <canvas ref={canvasRef} width={width} height={height}
+          style={{ display:'block', border:'1.5px solid var(--mint-border2)', borderRadius:14, margin:'0 auto 16px', opacity:0.88, background:'white' }}
+        />
+        <p style={{ fontSize:13,fontWeight:700,color:'var(--mint-text)',marginBottom:10,textAlign:'center' }}>ให้คะแนนการวาดภาพ</p>
+        <div style={{ display:'flex',gap:8,marginBottom:10 }}>
+          {[0,1,2].map(n=>(
+            <button key={n} onClick={()=>onScoreSelect(n)} style={{
+              flex:1, padding:'14px 6px', borderRadius:12, fontSize:14, fontWeight:800,
+              display:'flex', flexDirection:'column', alignItems:'center', gap:3,
+              background: n===2 ? 'var(--mint-primary-xl)' : n===1 ? '#fef9c3' : '#fff1f1',
+              border: `1.5px solid ${n===2?'var(--mint-primary)':n===1?'#fcd34d':'#fca5a5'}`,
+              color: n===2 ? 'var(--mint-primary)' : n===1 ? '#92400e' : '#dc2626',
+              cursor:'pointer', transition:'all 0.18s',
+            }}
+              onMouseOver={e=>e.currentTarget.style.opacity='0.85'}
+              onMouseOut={e=>e.currentTarget.style.opacity='1'}
+            >
+              <span style={{fontSize:20}}>{n===2?'✓✓':n===1?'△':'✗'}</span>
+              <span>{n} คะแนน</span>
+              <span style={{fontSize:10,opacity:0.7}}>{n===2?'สมบูรณ์':n===1?'บางส่วน':'ไม่ถูกต้อง'}</span>
+            </button>
+          ))}
+        </div>
+        <button onClick={()=>{setConfirmed(false);setIsEmpty(false);}} style={{
+          width:'100%',padding:'8px',borderRadius:9,background:'none',border:'none',color:'var(--mint-muted)',fontSize:12,cursor:'pointer',
+        }}>← วาดใหม่</button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
+      <canvas ref={canvasRef} width={width} height={height}
+        style={{ display:'block', border:'1.5px dashed var(--mint-border)', borderRadius:14, cursor:'crosshair', background:'white', touchAction:'none' }}
+        onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+        onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+      />
+      <div style={{ display:'flex',gap:8 }}>
+        <button onClick={handleClear} style={{
+          flex:1,padding:'10px',borderRadius:10,fontSize:13,fontWeight:700,
+          background:'var(--mint-surface2)',border:'1.5px solid var(--mint-border)',color:'var(--mint-muted)',cursor:'pointer',
+        }}>🗑️ ล้างใหม่</button>
+        <button onClick={()=>setConfirmed(true)} disabled={isEmpty} style={{
+          flex:2,padding:'10px',borderRadius:10,fontSize:13,fontWeight:700,
+          background:isEmpty?'var(--mint-border2)':'linear-gradient(135deg,var(--mint-primary),var(--mint-primary-l))',
+          color:isEmpty?'var(--mint-muted)':'white',border:'none',
+          cursor:isEmpty?'not-allowed':'pointer',transition:'all 0.2s',
+        }}>ยืนยันการวาด ✓</button>
+      </div>
+    </div>
+  );
+}
+
 /* ── main ── */
 export default function TMSEQuiz({ onBack, onComplete, patient }) {
   const [oriS,  setOriS]  = useState(Array(6).fill(null));
   const [regS,  setRegS]  = useState(null);
-  const [days,  setDays]  = useState([...DAYS_ORDER].reverse());
   const [attS,  setAttS]  = useState(null);
-  const [calcA, setCalcA] = useState(['','','']);
+  const [calcChk, setCalcChk] = useState([false,false,false]);
   const [calcS, setCalcS] = useState(null);
   const [langS, setLangS] = useState({ naming1:null, naming2:null, repeat:null, commands:Array(3).fill(null), read:null, copy:null, similarity:null });
-  const [recW,  setRecW]  = useState(['','','']);
-  const [recS,  setRecS]  = useState(null);
+  const [recS,  setRecS]  = useState(Array(3).fill(null)); // true/false per word
   const [done,  setDone]  = useState(false);
 
   const oriTotal  = oriS.filter(v=>v===1).length;
   const langTotal = (langS.naming1??0)+(langS.naming2??0)+(langS.repeat??0)+langS.commands.reduce((a,v)=>a+(v??0),0)+(langS.read??0)+(langS.copy??0)+(langS.similarity??0);
-  const total     = oriTotal+(regS??0)+(attS??0)+(calcS??0)+langTotal+(recS??0);
+  const recTotal  = recS.reduce((a,v) => a + (v??0), 0);
+  const total     = oriTotal+(regS??0)+(attS??0)+(calcS??0)+langTotal+recTotal;
   const impaired  = total < 24;
 
-  const moveDay = (i, d) => {
-    const a=[...days], j=i+d;
-    if(j<0||j>=a.length) return;
-    [a[i],a[j]]=[a[j],a[i]]; setDays(a); setAttS(null);
-  };
-  const evalAtt  = () => { let s=0; for(let i=0;i<DAYS_ORDER.length;i++){if(days[i]===DAYS_ORDER[i])s++;else break;} setAttS(Math.min(s,5)); };
-  const evalCalc = () => { let s=0; calcA.forEach((a,i)=>{if(parseInt(a)===CALC_ANS[i])s++;}); setCalcS(s); };
-  const evalRec  = () => { let s=0; recW.forEach(w=>{if(REG_WORDS.includes(w.trim()))s++;}); setRecS(s); };
   const setCmd   = (i, v) => { const c=[...langS.commands]; c[i]=v; setLangS(s=>({...s,commands:c})); };
+  const setRec   = (i, v) => { const a=[...recS]; a[i]=v; setRecS(a); };
 
   const handleFinish = () => {
     setDone(true);
@@ -127,7 +214,7 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
           attention:    attS ?? 0,
           calculation:  calcS ?? 0,
           language:     langTotal,
-          recall:       recS ?? 0,
+          recall:       recTotal,
         },
       });
     }
@@ -136,40 +223,36 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
   /* ── Result ── */
   if (done) {
     const sections=[
-      {l:'Orientation',  s:oriTotal,   m:6},
-      {l:'Registration', s:regS??0,    m:3},
-      {l:'Attention',    s:attS??0,    m:5},
-      {l:'Calculation',  s:calcS??0,   m:3},
-      {l:'Language',     s:langTotal,  m:10},
-      {l:'Recall',       s:recS??0,    m:3},
+      {l:'Orientation',  s:oriTotal,    m:6},
+      {l:'Registration', s:regS??0,     m:3},
+      {l:'Attention',    s:attS??0,     m:5},
+      {l:'Calculation',  s:calcS??0,    m:3},
+      {l:'Language',     s:langTotal,   m:10},
+      {l:'Recall',       s:recTotal,    m:3},
     ];
     return (
       <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column' }}>
-        <div style={{ position:'sticky',top:0,zIndex:50,background:'rgba(240,250,248,0.9)',backdropFilter:'blur(18px)',borderBottom:'1px solid var(--mint-border)',padding:'0 32px',height:60,display:'flex',alignItems:'center',gap:10 }}>
+        <div style={{ position:'sticky',top:0,zIndex:50,background:'rgba(240,250,248,0.9)',backdropFilter:'blur(18px)',borderBottom:'1px solid var(--mint-border)',padding:'0 16px',height:56,display:'flex',alignItems:'center',gap:8 }}>
           <Cross s={14}/><span style={{ fontSize:14,fontWeight:700,color:'var(--mint-text)' }}>TMSE — ผลการประเมิน</span>
           {patient && (
-            <span style={{ fontSize:12,color:'var(--mint-blue)',fontWeight:600,background:'var(--mint-blue-xl)',padding:'2px 10px',borderRadius:20,border:'1px solid var(--mint-border)',marginLeft:4 }}>
+            <span style={{ fontSize:11,color:'var(--mint-blue)',fontWeight:600,background:'var(--mint-blue-xl)',padding:'2px 8px',borderRadius:20,border:'1px solid var(--mint-border)',marginLeft:4,maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
               {patient.name} · {patient.age} ปี
             </span>
           )}
         </div>
-        <div style={{ flex:1,maxWidth:520,margin:'0 auto',width:'100%',padding:'40px 20px' }}>
-
-          {/* patient info */}
+        <div style={{ flex:1,maxWidth:520,margin:'0 auto',width:'100%',padding:'28px 16px' }}>
           {patient && (
             <div style={{ display:'flex',alignItems:'center',gap:10,padding:'12px 16px',background:'var(--mint-blue-xl)',border:'1px solid var(--mint-border)',borderRadius:14,marginBottom:20 }}>
               <span style={{ fontSize:18 }}>👤</span>
-              <div>
-                <p style={{ fontSize:14,fontWeight:700,color:'var(--mint-text)' }}>{patient.name}</p>
+              <div style={{ minWidth:0 }}>
+                <p style={{ fontSize:14,fontWeight:700,color:'var(--mint-text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{patient.name}</p>
                 <p style={{ fontSize:12,color:'var(--mint-muted)' }}>อายุ {patient.age} ปี</p>
               </div>
-              <div style={{ marginLeft:'auto',fontSize:11,color:'var(--mint-blue)',fontWeight:700,background:'white',padding:'4px 10px',borderRadius:20,border:'1px solid var(--mint-border)' }}>
+              <div style={{ marginLeft:'auto',fontSize:11,color:'var(--mint-blue)',fontWeight:700,background:'white',padding:'4px 10px',borderRadius:20,border:'1px solid var(--mint-border)',flexShrink:0 }}>
                 ✅ บันทึกแล้ว
               </div>
             </div>
           )}
-
-          {/* score ring */}
           <div style={{ textAlign:'center',marginBottom:28 }}>
             <div style={{ position:'relative',width:130,height:130,margin:'0 auto 12px' }}>
               <svg width="130" height="130" style={{ position:'absolute',inset:0 }}>
@@ -187,18 +270,16 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
             </div>
             <p style={{ fontSize:11,color:'var(--mint-muted)',letterSpacing:'0.08em',textTransform:'uppercase' }}>คะแนนรวม TMSE</p>
           </div>
-
           <div style={{ borderRadius:14,padding:'14px 18px',marginBottom:22,background:impaired?'#fff7ed':'#f0fdf9',border:`1.5px solid ${impaired?'#fcd34d':'#6ee7d5'}` }}>
             <p style={{ fontWeight:700,textAlign:'center',fontSize:14,color:impaired?'#92400e':'#065f46' }}>
               {impaired?'⚠️ มีภาวะ Cognitive Impairment (คะแนน < 24)':'✅ ผลการประเมินอยู่ในเกณฑ์ปกติ'}
             </p>
           </div>
-
           <div style={{ background:'white',border:'1px solid var(--mint-border2)',borderRadius:18,padding:'20px',marginBottom:20,boxShadow:'var(--shadow-sm)' }}>
             <p style={{ fontSize:11,color:'var(--mint-muted)',marginBottom:14,fontWeight:700,letterSpacing:'0.06em',textTransform:'uppercase' }}>คะแนนแยกหมวด</p>
             {sections.map(({l,s,m}) => (
               <div key={l} style={{ display:'flex',alignItems:'center',gap:10,marginBottom:10 }}>
-                <span style={{ fontSize:13,color:'var(--mint-text2)',width:110,flexShrink:0 }}>{l}</span>
+                <span style={{ fontSize:12,color:'var(--mint-text2)',width:90,flexShrink:0 }}>{l}</span>
                 <div style={{ flex:1,height:7,borderRadius:4,background:'var(--mint-border2)',overflow:'hidden' }}>
                   <div style={{ height:'100%',borderRadius:4,background:`linear-gradient(90deg,var(--mint-primary),var(--mint-primary-l))`,width:`${(s/m)*100}%`,transition:'width 0.8s ease' }}/>
                 </div>
@@ -206,7 +287,6 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
               </div>
             ))}
           </div>
-
           <p style={{ fontSize:11,color:'var(--mint-muted)',textAlign:'center',marginBottom:20 }}>
             * ผลนี้เป็นการประเมินเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์<br/>
             ที่มา: สารศิริราช 45(6) มิถุนายน 2536 : 359-374
@@ -221,25 +301,24 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
   /* ── Quiz ── */
   return (
     <div style={{ minHeight:'100vh', display:'flex', flexDirection:'column' }}>
-
       {/* topbar */}
-      <div style={{ position:'sticky',top:0,zIndex:50,background:'rgba(240,250,248,0.9)',backdropFilter:'blur(18px)',borderBottom:'1px solid var(--mint-border)',padding:'0 32px',height:60,display:'flex',alignItems:'center',justifyContent:'space-between' }}>
-        <button onClick={onBack} style={{ background:'none',border:'none',color:'var(--mint-muted)',cursor:'pointer',fontSize:13,fontWeight:600 }}>← กลับ</button>
-        <div style={{ display:'flex',alignItems:'center',gap:8 }}>
+      <div style={{ position:'sticky',top:0,zIndex:50,background:'rgba(240,250,248,0.9)',backdropFilter:'blur(18px)',borderBottom:'1px solid var(--mint-border)',padding:'0 16px',height:56,display:'flex',alignItems:'center',justifyContent:'space-between' }}>
+        <button onClick={onBack} style={{ background:'none',border:'none',color:'var(--mint-muted)',cursor:'pointer',fontSize:13,fontWeight:600,padding:'8px 0' }}>← กลับ</button>
+        <div style={{ display:'flex',alignItems:'center',gap:6 }}>
           <Cross s={14}/>
           <span style={{ fontSize:14,fontWeight:700,color:'var(--mint-text)' }}>TMSE</span>
           {patient && (
-            <span style={{ fontSize:12,color:'var(--mint-blue)',fontWeight:600,background:'var(--mint-blue-xl)',padding:'2px 10px',borderRadius:20,border:'1px solid var(--mint-border)' }}>
-              {patient.name} · {patient.age} ปี
+            <span style={{ fontSize:11,color:'var(--mint-blue)',fontWeight:600,background:'var(--mint-blue-xl)',padding:'2px 8px',borderRadius:20,border:'1px solid var(--mint-border)',maxWidth:120,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>
+              {patient.name}
             </span>
           )}
         </div>
-        <div style={{ fontSize:12,fontWeight:700,color:'var(--mint-primary)',background:'var(--mint-primary-xl)',border:'1px solid var(--mint-border)',borderRadius:20,padding:'3px 12px' }}>
+        <div style={{ fontSize:12,fontWeight:700,color:'var(--mint-primary)',background:'var(--mint-primary-xl)',border:'1px solid var(--mint-border)',borderRadius:20,padding:'3px 10px' }}>
           {total}/30
         </div>
       </div>
 
-      <div style={{ flex:1,maxWidth:600,margin:'0 auto',width:'100%',padding:'32px 20px',display:'flex',flexDirection:'column',gap:14 }}>
+      <div style={{ flex:1,maxWidth:600,margin:'0 auto',width:'100%',padding:'20px 14px',display:'flex',flexDirection:'column',gap:12 }}>
 
         {/* 1. Orientation */}
         <Section num="1" title="การรับรู้สภาพแวดล้อม (Orientation)" max={6} score={oriTotal}>
@@ -248,7 +327,7 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
 
         {/* 2. Registration */}
         <Section num="2" title="การลงทะเบียนคำศัพท์ (Registration)" max={3} score={regS??0}>
-          <div style={{ background:'var(--mint-primary-xl)',border:'1px solid var(--mint-border)',borderRadius:14,padding:16,marginBottom:14 }}>
+          <div style={{ background:'var(--mint-primary-xl)',border:'1px solid var(--mint-border)',borderRadius:14,padding:14,marginBottom:14 }}>
             <p style={{ fontSize:13,color:'var(--mint-text2)',fontStyle:'italic',textAlign:'center',lineHeight:1.7,marginBottom:12 }}>
               "เดี๋ยวจะบอกชื่อของ 3 อย่าง ให้ฟังดีๆ จะบอกเพียงครั้งเดียว เมื่อพูดจบแล้วให้พูดตาม"
             </p>
@@ -261,7 +340,7 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
           <p style={{ fontSize:12,color:'var(--mint-muted)',marginBottom:8 }}>ผู้ถูกทดสอบพูดตามได้กี่คำ?</p>
           <div style={{ display:'flex',gap:8 }}>
             {[0,1,2,3].map(n=>(
-              <button key={n} onClick={()=>setRegS(n)} style={{ flex:1,padding:'11px',borderRadius:10,fontSize:14,fontWeight:700,border:'1.5px solid',cursor:'pointer',transition:'all 0.18s',
+              <button key={n} onClick={()=>setRegS(n)} style={{ flex:1,padding:'12px 4px',borderRadius:10,fontSize:14,fontWeight:700,border:'1.5px solid',cursor:'pointer',transition:'all 0.18s',
                 background:regS===n?'var(--mint-primary-xl)':'var(--mint-surface2)',
                 borderColor:regS===n?'var(--mint-primary)':'var(--mint-border)',
                 color:regS===n?'var(--mint-primary)':'var(--mint-muted)',
@@ -272,48 +351,89 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
           </div>
         </Section>
 
-        {/* 3. Attention */}
+        {/* 3. Attention — CHECKBOX */}
         <Section num="3" title="ความสนใจ (Attention)" max={5} score={attS??0}>
-          <p style={{ fontSize:13,color:'var(--mint-text2)',marginBottom:4 }}>เรียงวันถอยหลัง เริ่มจาก <strong>อาทิตย์</strong></p>
-          <p style={{ fontSize:11,color:'var(--mint-muted)',marginBottom:12 }}>กด ↑ ↓ เพื่อจัดเรียง</p>
-          <div style={{ display:'flex',flexDirection:'column',gap:6,marginBottom:12 }}>
-            {days.map((day,i)=>(
-              <div key={day} style={{ display:'flex',alignItems:'center',gap:8,background:'var(--mint-surface2)',border:'1px solid var(--mint-border2)',borderRadius:10,padding:'8px 12px' }}>
-                <span style={{ fontSize:11,color:'var(--mint-muted)',width:18 }}>{i+1}.</span>
-                <span style={{ flex:1,fontSize:14,fontWeight:600,color:'var(--mint-text)' }}>{day}</span>
-                <button onClick={()=>moveDay(i,-1)} disabled={i===0} style={{ background:'none',border:'none',color:i===0?'var(--mint-border)':'var(--mint-muted)',cursor:i===0?'default':'pointer',fontSize:16,padding:'0 4px' }}>↑</button>
-                <button onClick={()=>moveDay(i,1)} disabled={i===days.length-1} style={{ background:'none',border:'none',color:i===days.length-1?'var(--mint-border)':'var(--mint-muted)',cursor:i===days.length-1?'default':'pointer',fontSize:16,padding:'0 4px' }}>↓</button>
-              </div>
+          <p style={{ fontSize:13,color:'var(--mint-text2)',marginBottom:4 }}>ให้ผู้ถูกทดสอบบอกวันถอยหลัง เริ่มจาก <strong>อาทิตย์</strong></p>
+          <p style={{ fontSize:11,color:'var(--mint-muted)',marginBottom:12 }}>กดจำนวนวันที่ตอบถูกต้องต่อเนื่องจากต้น (หยุดนับเมื่อตอบผิดครั้งแรก, max 5)</p>
+          <div style={{ display:'flex',flexDirection:'column',gap:6,marginBottom:14 }}>
+            {DAYS_ORDER.map((day,i)=>{
+              const checked = attS !== null && i < (attS??0);
+              return (
+                <div key={day} style={{
+                  display:'flex',alignItems:'center',gap:12,padding:'10px 14px',borderRadius:11,
+                  background: checked ? 'var(--mint-primary-xl)' : 'var(--mint-surface2)',
+                  border:`1.5px solid ${checked ? 'var(--mint-primary)' : 'var(--mint-border2)'}`,
+                  opacity: i >= 5 ? 0.4 : 1, transition:'all 0.18s',
+                }}>
+                  <div style={{
+                    width:22,height:22,borderRadius:6,flexShrink:0,
+                    border:`2px solid ${checked?'var(--mint-primary)':'var(--mint-border)'}`,
+                    background:checked?'var(--mint-primary)':'white',
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    fontSize:13,color:'white',fontWeight:700,transition:'all 0.15s',
+                  }}>{checked?'✓':''}</div>
+                  <span style={{ fontSize:14,fontWeight:600,color:checked?'var(--mint-primary)':'var(--mint-text)',flex:1 }}>{day}</span>
+                  <span style={{ fontSize:11,color:'var(--mint-muted)' }}>ลำดับที่ {i+1}{i>=5?' (ไม่นับ)':''}</span>
+                </div>
+              );
+            })}
+          </div>
+          <p style={{ fontSize:12,color:'var(--mint-text2)',marginBottom:8,fontWeight:600 }}>ตอบถูกต้องต่อเนื่องกี่วัน?</p>
+          <div style={{ display:'flex',gap:6 }}>
+            {[0,1,2,3,4,5].map(n=>(
+              <button key={n} onClick={()=>setAttS(n)} style={{
+                flex:1,padding:'11px 2px',borderRadius:10,fontSize:14,fontWeight:700,
+                border:'1.5px solid',cursor:'pointer',transition:'all 0.18s',
+                background:attS===n?'var(--mint-primary-xl)':'var(--mint-surface2)',
+                borderColor:attS===n?'var(--mint-primary)':'var(--mint-border)',
+                color:attS===n?'var(--mint-primary)':'var(--mint-muted)',
+              }}>{n}</button>
             ))}
           </div>
-          <ActionBtn onClick={evalAtt} variant="ghost">ตรวจคำตอบ</ActionBtn>
           {attS!==null && (
-            <p style={{ textAlign:'center',marginTop:8,fontSize:13,fontWeight:700,color:attS>=4?'var(--mint-primary)':'var(--mint-warn)' }}>
-              ถูกต้องต่อเนื่อง {attS} วัน (max 5)
+            <p style={{ textAlign:'center',marginTop:10,fontSize:13,fontWeight:700,color:attS>=4?'var(--mint-primary)':'var(--mint-warn)' }}>
+              ✓ บันทึก {attS} คะแนน
             </p>
           )}
         </Section>
 
-        {/* 4. Calculation */}
+        {/* 4. Calculation — CHECKBOX */}
         <Section num="4" title="การคิดคำนวณ (Calculation)" max={3} score={calcS??0}>
-          <p style={{ fontSize:13,color:'var(--mint-text2)',marginBottom:14 }}>คิดเลข 100 − 7 ไปเรื่อยๆ 3 ครั้ง</p>
-          <div style={{ display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:14 }}>
-            <span style={{ fontSize:15,fontWeight:700,color:'var(--mint-text)' }}>100</span>
-            {calcA.map((v,i)=>(
-              <React.Fragment key={i}>
-                <span style={{ color:'var(--mint-muted)',fontSize:16 }}>→</span>
-                <div style={{ display:'flex',flexDirection:'column',alignItems:'center',gap:3 }}>
-                  <input type="number" value={v} placeholder="?" onChange={e=>{const a=[...calcA];a[i]=e.target.value;setCalcA(a);setCalcS(null);}}
-                    style={{ width:70,padding:'10px 8px',background:'var(--mint-surface2)',border:'1.5px solid var(--mint-border)',borderRadius:10,fontSize:14,fontWeight:700,color:'var(--mint-text)',outline:'none',textAlign:'center',boxSizing:'border-box'}}
-                    onFocus={e=>e.target.style.borderColor='var(--mint-primary)'}
-                    onBlur={e=>e.target.style.borderColor='var(--mint-border)'}
-                  />
-                  {calcS!==null && <span style={{ fontSize:11,fontWeight:700,color:parseInt(v)===CALC_ANS[i]?'var(--mint-success)':'var(--mint-danger)' }}>{parseInt(v)===CALC_ANS[i]?'✓':`✗(${CALC_ANS[i]})`}</span>}
-                </div>
-              </React.Fragment>
-            ))}
+          <p style={{ fontSize:13,color:'var(--mint-text2)',marginBottom:4 }}>คิดเลข <strong>100 − 7</strong> ไปเรื่อยๆ 3 ครั้ง</p>
+          <p style={{ fontSize:11,color:'var(--mint-muted)',marginBottom:14 }}>เฉลย: 100 → 93 → 86 → 79</p>
+          <div style={{ display:'flex',flexDirection:'column',gap:8,marginBottom:14 }}>
+            {[[100,93,0],[93,86,1],[86,79,2]].map(([from,to,i])=>{
+              const checked = calcS !== null && i < calcS;
+              const isChecked = calcChk[i];
+              return (
+                <button key={i} onClick={()=>{ const a=[...calcChk]; a[i]=!a[i]; setCalcChk(a); const s=a.filter(Boolean).length; setCalcS(s); }} style={{
+                  display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:12,
+                  background: isChecked ? 'var(--mint-primary-xl)' : 'var(--mint-surface2)',
+                  border:`1.5px solid ${isChecked ? 'var(--mint-primary)' : 'var(--mint-border2)'}`,
+                  cursor:'pointer',transition:'all 0.18s',textAlign:'left',
+                }}>
+                  <div style={{
+                    width:24,height:24,borderRadius:7,flexShrink:0,
+                    border:`2px solid ${isChecked?'var(--mint-primary)':'var(--mint-border)'}`,
+                    background:isChecked?'var(--mint-primary)':'white',
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    fontSize:14,color:'white',fontWeight:700,transition:'all 0.15s',
+                  }}>{isChecked?'✓':''}</div>
+                  <span style={{ fontSize:14,fontWeight:700,color:isChecked?'var(--mint-primary)':'var(--mint-text)' }}>
+                    {from} − 7 = <strong>{to}</strong>
+                  </span>
+                  <span style={{ marginLeft:'auto',fontSize:12,color:isChecked?'var(--mint-primary)':'var(--mint-muted)',fontWeight:600 }}>
+                    {isChecked?'✓ ถูก':'ยังไม่ระบุ'}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <ActionBtn onClick={evalCalc} variant="ghost">ตรวจคำตอบ</ActionBtn>
+          {calcS!==null && (
+            <p style={{ textAlign:'center',fontSize:13,fontWeight:700,color:calcS>=2?'var(--mint-primary)':'var(--mint-warn)' }}>
+              ✓ บันทึก {calcS}/3 คะแนน
+            </p>
+          )}
         </Section>
 
         {/* 5. Language */}
@@ -354,22 +474,26 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
             <div style={{ background:'var(--mint-surface2)',border:'1px solid var(--mint-border2)',borderRadius:12,padding:'12px 14px' }}>
               <p style={{ fontSize:13,color:'var(--mint-text2)',fontWeight:500,marginBottom:10 }}>5.6 วาดภาพตามตัวอย่าง (2 คะแนน)</p>
               <div style={{ display:'flex',justifyContent:'center',marginBottom:12 }}>
-                <svg width="120" height="100" viewBox="0 0 120 100" style={{ border:'1px solid var(--mint-border)',borderRadius:12,background:'white' }}>
-                  <polygon points="60,10 110,50 10,50" fill="none" stroke="var(--mint-text2)" strokeWidth="2.5" strokeLinejoin="round"/>
-                  <rect x="25" y="50" width="70" height="40" fill="none" stroke="var(--mint-text2)" strokeWidth="2.5"/>
-                </svg>
+                <div style={{ textAlign:'center' }}>
+                  <p style={{ fontSize:11,color:'var(--mint-muted)',marginBottom:6 }}>ภาพตัวอย่าง</p>
+                  <svg width="130" height="100" viewBox="0 0 130 100" style={{ border:'1.5px solid var(--mint-border)',borderRadius:12,background:'white',padding:4 }}>
+                    <polygon points="65,8 118,48 12,48" fill="none" stroke="var(--mint-text2)" strokeWidth="2.5" strokeLinejoin="round"/>
+                    <rect x="22" y="48" width="86" height="44" fill="none" stroke="var(--mint-text2)" strokeWidth="2.5"/>
+                  </svg>
+                </div>
               </div>
-              <div style={{ display:'flex',gap:8 }}>
-                {[0,1,2].map(n=>(
-                  <button key={n} onClick={()=>setLangS(s=>({...s,copy:n}))} style={{ flex:1,padding:'10px',borderRadius:10,fontSize:13,fontWeight:700,border:'1.5px solid',cursor:'pointer',transition:'all 0.18s',
-                    background:langS.copy===n?'var(--mint-primary-xl)':'var(--mint-surface2)',
-                    borderColor:langS.copy===n?'var(--mint-primary)':'var(--mint-border)',
-                    color:langS.copy===n?'var(--mint-primary)':'var(--mint-muted)',
-                  }}>
-                    {n} คะแนน
-                  </button>
-                ))}
-              </div>
+              <p style={{ fontSize:11,color:'var(--mint-muted)',marginBottom:10 }}>วาดภาพตามตัวอย่างด้านบน (สี่เหลี่ยมทับสามเหลี่ยมที่มีสองส่วนทับกัน)</p>
+              {langS.copy===null
+                ? <DrawingCanvas width={280} height={180} onScoreSelect={v=>setLangS(s=>({...s,copy:v}))} />
+                : (
+                  <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:langS.copy===2?'var(--mint-primary-xl)':langS.copy===1?'#fef9c3':'#fff1f1',border:`1px solid ${langS.copy===2?'var(--mint-primary)':langS.copy===1?'#fcd34d':'#fca5a5'}`,borderRadius:10 }}>
+                    <span style={{ fontWeight:700,fontSize:14,color:langS.copy===2?'var(--mint-primary)':langS.copy===1?'#92400e':'#dc2626' }}>
+                      {langS.copy===2?'✓✓ 2 คะแนน (สมบูรณ์)':langS.copy===1?'△ 1 คะแนน (บางส่วน)':'✗ 0 คะแนน'}
+                    </span>
+                    <button onClick={()=>setLangS(s=>({...s,copy:null}))} style={{ fontSize:11,color:'var(--mint-muted)',background:'none',border:'none',cursor:'pointer' }}>แก้ไข</button>
+                  </div>
+                )
+              }
             </div>
 
             <div style={{ background:'var(--mint-surface2)',border:'1px solid var(--mint-border2)',borderRadius:12,padding:'12px 14px' }}>
@@ -382,33 +506,60 @@ export default function TMSEQuiz({ onBack, onComplete, patient }) {
           </div>
         </Section>
 
-        {/* 6. Recall */}
-        <Section num="6" title="การระลึก (Recall)" max={3} score={recS??0}>
-          <p style={{ fontSize:13,color:'var(--mint-text2)',marginBottom:12 }}>ให้บอกสิ่งของ 3 อย่างที่จำได้จากตอนแรก</p>
-          <div style={{ display:'flex',flexDirection:'column',gap:8,marginBottom:12 }}>
-            {recW.map((w,i)=>(
-              <FocusInput key={i} value={w} placeholder={`คำที่ ${i+1}`} style={{ textAlign:'center' }}
-                onChange={e=>{const a=[...recW];a[i]=e.target.value;setRecW(a);setRecS(null);}} />
+        {/* 6. Recall — TRUE/FALSE per word */}
+        <Section num="6" title="การระลึก (Recall)" max={3} score={recTotal}>
+          <p style={{ fontSize:13,color:'var(--mint-text2)',marginBottom:14 }}>
+            ผู้ถูกทดสอบระลึกคำแต่ละคำได้หรือไม่?
+          </p>
+          <div style={{ display:'flex',flexDirection:'column',gap:10 }}>
+            {REG_WORDS.map((word, i) => (
+              <div key={word} style={{
+                background: recS[i]===1 ? 'var(--mint-primary-xl)' : recS[i]===0 ? '#fff1f1' : 'var(--mint-surface2)',
+                border: `1.5px solid ${recS[i]===1 ? 'var(--mint-primary)' : recS[i]===0 ? '#fca5a5' : 'var(--mint-border2)'}`,
+                borderRadius:12, padding:'12px 14px', transition:'all 0.2s',
+              }}>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10 }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <span style={{
+                      width:28, height:28, borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center',
+                      background: recS[i]===1 ? 'var(--mint-primary)' : recS[i]===0 ? '#ef4444' : 'var(--mint-border2)',
+                      fontSize:14, transition:'all 0.2s',
+                    }}>
+                      {recS[i]===1 ? '✓' : recS[i]===0 ? '✗' : <span style={{fontSize:10,color:'var(--mint-muted)'}}>{i+1}</span>}
+                    </span>
+                    <span style={{ fontSize:15, fontWeight:800, color: recS[i]===1 ? 'var(--mint-primary)' : recS[i]===0 ? '#ef4444' : 'var(--mint-text)' }}>
+                      {word}
+                    </span>
+                  </div>
+                  <div style={{ display:'flex', gap:6 }}>
+                    <button onClick={() => setRec(i, 1)} style={{
+                      padding:'7px 14px', borderRadius:9, fontSize:12, fontWeight:700,
+                      border:`1.5px solid ${recS[i]===1 ? 'var(--mint-primary)' : 'var(--mint-border)'}`,
+                      background: recS[i]===1 ? 'var(--mint-primary)' : 'white',
+                      color: recS[i]===1 ? 'white' : 'var(--mint-muted)',
+                      cursor:'pointer', transition:'all 0.18s',
+                    }}>จำได้</button>
+                    <button onClick={() => setRec(i, 0)} style={{
+                      padding:'7px 14px', borderRadius:9, fontSize:12, fontWeight:700,
+                      border:`1.5px solid ${recS[i]===0 ? '#fca5a5' : 'var(--mint-border)'}`,
+                      background: recS[i]===0 ? '#ef4444' : 'white',
+                      color: recS[i]===0 ? 'white' : 'var(--mint-muted)',
+                      cursor:'pointer', transition:'all 0.18s',
+                    }}>ลืม</button>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
-          <ActionBtn onClick={evalRec} variant="primary">ตรวจคำตอบ</ActionBtn>
-          {recS!==null && (
-            <div style={{ display:'flex',gap:8,marginTop:10 }}>
-              {REG_WORDS.map(word=>{
-                const ok=recW.some(w=>w.trim()===word);
-                return (
-                  <div key={word} style={{ flex:1,textAlign:'center',padding:'8px',borderRadius:10,fontSize:12,fontWeight:700,background:ok?'var(--mint-primary-xl)':'#fff1f1',border:`1px solid ${ok?'var(--mint-primary)':'#fca5a5'}`,color:ok?'var(--mint-primary)':'#ef4444' }}>
-                    {ok?'✓':'✗'} {word}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <div style={{ marginTop:12, padding:'10px 14px', background:'var(--mint-surface2)', border:'1px solid var(--mint-border2)', borderRadius:10, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ fontSize:13, color:'var(--mint-text2)' }}>ระลึกได้ทั้งหมด</span>
+            <span style={{ fontSize:16, fontWeight:800, color:'var(--mint-primary)' }}>{recTotal}/3 คำ</span>
+          </div>
         </Section>
 
         {/* Submit */}
-        <div style={{ background:'white',border:'1.5px solid var(--mint-border)',borderRadius:20,padding:'22px',boxShadow:'var(--shadow-md)' }}>
-          <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14 }}>
+        <div style={{ background:'white',border:'1.5px solid var(--mint-border)',borderRadius:20,padding:'20px 16px',boxShadow:'var(--shadow-md)' }}>
+          <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12 }}>
             <span style={{ fontSize:15,fontWeight:700,color:'var(--mint-text)' }}>คะแนนรวมทั้งหมด</span>
             <span style={{ fontSize:28,fontWeight:800,color:total>=24?'var(--mint-primary)':'var(--mint-warn)' }}>
               {total}<span style={{ fontSize:14,color:'var(--mint-muted)',fontWeight:400 }}>/30</span>
