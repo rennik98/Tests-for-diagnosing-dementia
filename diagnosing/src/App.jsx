@@ -885,7 +885,7 @@ export default function App() {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Cross s={12} />
-          <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>DementiaEval — เครื่องมือคัดกรองเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์</span>
+          <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>BrainCheck — เครื่องมือคัดกรองเบื้องต้นเท่านั้น ไม่ใช่การวินิจฉัยทางการแพทย์</span>
         </div>
         <span style={{ fontSize: 11, color: 'var(--mint-muted)' }}>Mini-Cog™ © S. Borson</span>
       </footer>
